@@ -522,11 +522,61 @@
           </div>
         </div>
 
+        <!-- 安全性管理區：修改後臺管理密碼 -->
+        <div class="admin-section-box" style="margin-top: 1rem;">
+          <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:0.45rem;">
+            🔑 修改教師管理密碼
+          </label>
+          <div style="display:flex; flex-direction:column; gap:0.5rem;">
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <input type="password" id="admin-new-password" class="form-input" placeholder="請輸入新密碼 (例如：1234 或 自訂英數密碼)" style="flex:1;">
+              <button id="admin-btn-save-password" class="btn-primary" style="padding:0.55rem 1rem; flex-shrink:0;">
+                💾 變更密碼
+              </button>
+            </div>
+            <span style="font-size:0.74rem; color:var(--text-muted);">
+              目前管理密碼為：<strong style="color:var(--brand-primary); letter-spacing:1px;" id="admin-current-pwd-hint">1234</strong>（可在此直接輸入新密碼儲存）
+            </span>
+          </div>
+        </div>
+
         <div style="margin-top: 1.25rem; display:flex; justify-content:flex-end;">
           <button id="admin-btn-finish" class="btn-primary" style="padding: 0.65rem 1.5rem;">
             完成並關閉後臺
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. 教師後臺密碼驗證彈窗 (Admin Auth Modal) -->
+  <div class="modal-backdrop" id="modal-admin-auth">
+    <div class="modal-sheet" style="max-width: 420px;">
+      <div class="modal-rainbow-bar"></div>
+      <div class="modal-content" style="align-items: stretch; text-align: left; padding: 1.75rem 2rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+          <h3 style="font-size: 1.15rem; font-weight: 800; display:flex; align-items:center; gap:0.45rem;">
+            <span>🔐 教師管理身分驗證</span>
+          </h3>
+          <button class="btn-icon" id="close-admin-auth-btn" style="width: 32px; height: 32px; font-size: 1rem;">✕</button>
+        </div>
+
+        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:1.1rem;">
+          為防止學童誤觸或任意刪除班級設定，請輸入教師管理密碼。（<strong>預設密碼：1234</strong>）
+        </p>
+
+        <form id="form-admin-auth" onsubmit="return false;" style="display:flex; flex-direction:column; gap:0.75rem;">
+          <div>
+            <label for="admin-auth-password" style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.3rem;">管理密碼</label>
+            <input type="password" id="admin-auth-password" class="form-input" placeholder="請輸入密碼 (預設 1234)" autocomplete="current-password" required>
+          </div>
+          <div id="admin-auth-error" style="color:#ef4444; font-size:0.75rem; font-weight:bold; display:none;">
+            ❌ 密碼錯誤，請重新輸入！
+          </div>
+          <button type="submit" id="btn-submit-admin-auth" class="btn-primary" style="margin-top:0.35rem; padding:0.65rem; justify-content:center;">
+            解鎖並進入後臺 ➔
+          </button>
+        </form>
       </div>
     </div>
   </div>
@@ -538,7 +588,7 @@
       <div style="font-size:0.72rem; color:var(--text-muted); display:flex; gap:1rem;">
         <a href="javascript:void(0)" onclick="document.getElementById('modal-student-login').classList.add('active')" style="color:var(--brand-primary); text-decoration:none;">🎒 切換學生身分</a>
         <span>·</span>
-        <a href="javascript:void(0)" onclick="document.getElementById('modal-admin').classList.add('active'); if(window.renderAdminClassTags) window.renderAdminClassTags();" style="color:var(--text-muted); text-decoration:none;">⚙️ 教師後臺管理</a>
+        <a href="javascript:void(0)" onclick="if(window.openAdminAuthModal) window.openAdminAuthModal();" style="color:var(--text-muted); text-decoration:none;">⚙️ 教師後臺管理</a>
       </div>
     </div>
   </footer>

@@ -1381,8 +1381,25 @@ function initModals() {
     };
   }
 
-  // 3. 教師與後臺班級參數管理系統彈窗
+  // 3. 教師與後臺班級參數管理系統彈窗 (含密碼防護與修改機制)
   const adminModal = document.getElementById('modal-admin');
+  const adminAuthModal = document.getElementById('modal-admin-auth');
+  const authForm = document.getElementById('form-admin-auth');
+  const authPasswordInp = document.getElementById('admin-auth-password');
+  const authErrorEl = document.getElementById('admin-auth-error');
+
+  // 開啟教師身分密碼驗證視窗
+  window.openAdminAuthModal = function() {
+    if (adminAuthModal) {
+      if (authPasswordInp) authPasswordInp.value = '';
+      if (authErrorEl) authErrorEl.style.display = 'none';
+      adminAuthModal.classList.add('active');
+      setTimeout(() => {
+        if (authPasswordInp) authPasswordInp.focus();
+      }, 100);
+    }
+  };
+
   const openAdminBtns = [
     document.getElementById('nav-btn-admin'),
     document.getElementById('login-admin-quicklink')
@@ -1390,11 +1407,46 @@ function initModals() {
 
   openAdminBtns.forEach(btn => {
     btn.onclick = () => {
-      if (adminModal) adminModal.classList.add('active');
-      renderAdminClassTags();
+      window.openAdminAuthModal();
     };
   });
 
+  // 驗證密碼送出
+  if (authForm) {
+    authForm.onsubmit = (e) => {
+      e.preventDefault();
+      const entered = authPasswordInp ? authPasswordInp.value : '';
+      const isCorrect = window.cloudSync ? window.cloudSync.verifyAdminPassword(entered) : (entered === '1234');
+
+      if (isCorrect) {
+        if (adminAuthModal) adminAuthModal.classList.remove('active');
+        if (adminModal) adminModal.classList.add('active');
+        window.renderAdminClassTags();
+
+        // 更新後臺面板上的目前密碼提示
+        const currentPwdHint = document.getElementById('admin-current-pwd-hint');
+        if (currentPwdHint && window.cloudSync) {
+          currentPwdHint.innerText = window.cloudSync.getAdminPassword();
+        }
+      } else {
+        if (authErrorEl) authErrorEl.style.display = 'block';
+        if (authPasswordInp) {
+          authPasswordInp.select();
+          authPasswordInp.focus();
+        }
+      }
+    };
+  }
+
+  // 關閉驗證視窗
+  const closeAuthBtn = document.getElementById('close-admin-auth-btn');
+  if (closeAuthBtn) {
+    closeAuthBtn.onclick = () => {
+      if (adminAuthModal) adminAuthModal.classList.remove('active');
+    };
+  }
+
+  // 關閉後臺視窗
   const closeAdminBtns = [
     document.getElementById('close-admin-btn'),
     document.getElementById('admin-btn-finish')
@@ -1497,6 +1549,35 @@ function initModals() {
         window.renderAdminClassTags();
         alert('✅ 已成功還原為全校預設班級！');
       }
+    };
+  }
+
+  // 後臺：修改管理密碼
+  const savePasswordBtn = document.getElementById('admin-btn-save-password');
+  const newPasswordInp = document.getElementById('admin-new-password');
+  if (savePasswordBtn && newPasswordInp) {
+    savePasswordBtn.onclick = () => {
+      const newPass = newPasswordInp.value.trim();
+      if (!newPass) {
+        alert('⚠️ 請輸入有效的新密碼（不可為空白）！');
+        newPasswordInp.focus();
+        return;
+      }
+      if (newPass.length < 2) {
+        alert('⚠️ 密碼長度建議至少 2 個字元以上！');
+        newPasswordInp.focus();
+        return;
+      }
+
+      if (window.cloudSync) {
+        window.cloudSync.setAdminPassword(newPass);
+      }
+      newPasswordInp.value = '';
+
+      const currentPwdHint = document.getElementById('admin-current-pwd-hint');
+      if (currentPwdHint) currentPwdHint.innerText = newPass;
+
+      alert(`✅ 後臺管理密碼已成功變更為：【 ${newPass} 】！\n請老師妥善記住新密碼。`);
     };
   }
 

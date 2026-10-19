@@ -22,12 +22,37 @@ class CloudSyncManager {
     this.storageKey = 'typehero_student_profile';
     this.firebaseConfigKey = 'typehero_firebase_config';
     this.classListKey = 'typehero_class_list';
+    this.adminPasswordKey = 'typehero_admin_password';
     this.profile = this.loadProfile();
     this.classList = this.loadClassList();
     this.isFirebaseReady = false;
     this.db = null;
 
     this.initFirebase();
+  }
+
+  getAdminPassword() {
+    return localStorage.getItem(this.adminPasswordKey) || '1234';
+  }
+
+  verifyAdminPassword(input) {
+    const target = this.getAdminPassword();
+    return String(input).trim() === target;
+  }
+
+  setAdminPassword(newPassword) {
+    const cleanPass = String(newPassword).trim();
+    if (!cleanPass) return false;
+    localStorage.setItem(this.adminPasswordKey, cleanPass);
+
+    // 雲端同步
+    if (this.isFirebaseReady && this.db) {
+      this.db.collection('config').doc('school_config').set({
+        adminPassword: cleanPass,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(err => console.warn('雲端管理密碼同步失敗:', err));
+    }
+    return true;
   }
 
   loadProfile() {
@@ -161,6 +186,9 @@ class CloudSyncManager {
           localStorage.setItem(this.classListKey, JSON.stringify(this.classList));
           this.populateClassSelects();
           console.log('☁️ 成功從雲端同步學校班級名單！');
+        }
+        if (data.adminPassword) {
+          localStorage.setItem(this.adminPasswordKey, data.adminPassword);
         }
       }
     } catch (e) {
