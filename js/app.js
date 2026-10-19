@@ -128,6 +128,27 @@ document.addEventListener('DOMContentLoaded', () => {
   // 預設載入注音第 1 關
   loadCategory('zhuyin');
 
+  // 初始化班級下拉選單與學生身分顯示
+  if (window.cloudSync) {
+    window.cloudSync.populateClassSelects();
+    window.cloudSync.updateProfileBadgeUI();
+  }
+
+  // 載入首頁先跳出學生班級、座號與姓名登載彈窗
+  const loginModal = document.getElementById('modal-student-login');
+  if (loginModal) {
+    loginModal.classList.add('active');
+    const p = window.cloudSync ? window.cloudSync.profile : null;
+    if (p) {
+      const seatInp = document.getElementById('login-seat-input');
+      const nameInp = document.getElementById('login-name-input');
+      const classSel = document.getElementById('login-class-select');
+      if (seatInp) seatInp.value = p.seatNumber || '';
+      if (nameInp) nameInp.value = p.nickname || '';
+      if (classSel) classSel.value = p.className || (window.cloudSync.classList[0] || '5年3班');
+    }
+  }
+
   // 點擊舞台聚焦真實輸入框
   const arena = document.getElementById('typing-arena');
   const alertOverlay = document.getElementById('focus-alert');
@@ -1287,13 +1308,18 @@ function initModals() {
   };
   document.getElementById('close-leader-btn').onclick = () => leaderModal.classList.remove('active');
 
-  // 個人班級雲端設定彈窗
+  // 1. 個人班級雲端設定彈窗
   const profileModal = document.getElementById('modal-profile');
   document.getElementById('user-profile-badge').onclick = () => {
     const p = window.cloudSync ? window.cloudSync.profile : { className: '5年3班', seatNumber: '01', nickname: '鍵盤小英雄' };
-    document.getElementById('input-class-name').value = p.className;
-    document.getElementById('input-seat-num').value = p.seatNumber;
-    document.getElementById('input-nickname').value = p.nickname;
+    if (window.cloudSync) window.cloudSync.populateClassSelects(p.className);
+    const classSel = document.getElementById('input-class-name');
+    const seatInp = document.getElementById('input-seat-num');
+    const nickInp = document.getElementById('input-nickname');
+
+    if (classSel) classSel.value = p.className;
+    if (seatInp) seatInp.value = p.seatNumber;
+    if (nickInp) nickInp.value = p.nickname;
 
     // 同步顯示目前裝備的冒險角色大貼紙
     const modalAvatar = document.getElementById('profile-modal-avatar');
@@ -1310,9 +1336,180 @@ function initModals() {
     const s = document.getElementById('input-seat-num').value.trim() || '01';
     const n = document.getElementById('input-nickname').value.trim() || '鍵盤小英雄';
     if (window.cloudSync) window.cloudSync.saveProfile(c, s, n);
+    if (window.shopManager) window.shopManager.updateUI();
     profileModal.classList.remove('active');
     alert('✅ 個人檔案與班級設定已更新！');
   };
+
+  // 2. 學生登載資料歡迎彈窗 (首頁載入)
+  const loginModal = document.getElementById('modal-student-login');
+  const loginForm = document.getElementById('form-student-login');
+  const loginClassSel = document.getElementById('login-class-select');
+  const loginSeatInp = document.getElementById('login-seat-input');
+  const loginNameInp = document.getElementById('login-name-input');
+
+  if (loginForm) {
+    loginForm.onsubmit = (e) => {
+      e.preventDefault();
+      const selClass = loginClassSel ? loginClassSel.value : '5年3班';
+      const seatVal = loginSeatInp ? loginSeatInp.value.trim() : '';
+      const nameVal = loginNameInp ? loginNameInp.value.trim() : '';
+
+      if (!seatVal) {
+        alert('⚠️ 請輸入學生座號喔！');
+        if (loginSeatInp) loginSeatInp.focus();
+        return;
+      }
+      if (!nameVal) {
+        alert('⚠️ 請輸入姓名或打字暱稱喔！');
+        if (loginNameInp) loginNameInp.focus();
+        return;
+      }
+
+      if (window.cloudSync) {
+        window.cloudSync.saveProfile(selClass, seatVal, nameVal);
+      }
+      if (window.shopManager) {
+        window.shopManager.updateUI();
+      }
+      if (window.soundEngine) {
+        window.soundEngine.playCoin();
+      }
+
+      if (loginModal) loginModal.classList.remove('active');
+      focusTyping();
+    };
+  }
+
+  // 3. 教師與後臺班級參數管理系統彈窗
+  const adminModal = document.getElementById('modal-admin');
+  const openAdminBtns = [
+    document.getElementById('nav-btn-admin'),
+    document.getElementById('login-admin-quicklink')
+  ].filter(Boolean);
+
+  openAdminBtns.forEach(btn => {
+    btn.onclick = () => {
+      if (adminModal) adminModal.classList.add('active');
+      renderAdminClassTags();
+    };
+  });
+
+  const closeAdminBtns = [
+    document.getElementById('close-admin-btn'),
+    document.getElementById('admin-btn-finish')
+  ].filter(Boolean);
+
+  closeAdminBtns.forEach(btn => {
+    btn.onclick = () => {
+      if (adminModal) adminModal.classList.remove('active');
+    };
+  });
+
+  // 繪製後臺班級標籤與清單
+  window.renderAdminClassTags = function() {
+    const container = document.getElementById('admin-class-tags-container');
+    const countEl = document.getElementById('admin-class-count');
+    const batchTextarea = document.getElementById('admin-batch-textarea');
+    if (!container || !window.cloudSync) return;
+
+    container.innerHTML = '';
+    const list = window.cloudSync.classList || [];
+    if (countEl) countEl.innerText = list.length;
+    if (batchTextarea) batchTextarea.value = list.join('\n');
+
+    list.forEach(cls => {
+      const tag = document.createElement('span');
+      tag.className = 'admin-class-tag';
+      tag.innerHTML = `
+        <span>${cls}</span>
+        <button type="button" class="btn-tag-del" title="刪除「${cls}」">✕</button>
+      `;
+      tag.querySelector('.btn-tag-del').onclick = () => {
+        if (confirm(`確定要從下拉選單中刪除「${cls}」嗎？`)) {
+          window.cloudSync.removeClass(cls);
+          window.renderAdminClassTags();
+        }
+      };
+      container.appendChild(tag);
+    });
+  };
+
+  // 後臺：新增單一班級
+  const addClassBtn = document.getElementById('admin-add-class-btn');
+  const addClassInp = document.getElementById('admin-new-class-input');
+  if (addClassBtn && addClassInp) {
+    addClassBtn.onclick = () => {
+      const val = addClassInp.value.trim();
+      if (!val) {
+        alert('請輸入要新增的班級名稱（例如：5年4班）！');
+        addClassInp.focus();
+        return;
+      }
+      const ok = window.cloudSync.addClass(val);
+      if (!ok) {
+        alert(`班級「${val}」已經在選單中囉！`);
+      } else {
+        addClassInp.value = '';
+        window.renderAdminClassTags();
+      }
+    };
+    addClassInp.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addClassBtn.click();
+      }
+    };
+  }
+
+  // 後臺：切換批次編輯
+  const toggleBatchBtn = document.getElementById('admin-btn-toggle-batch');
+  const batchWrapper = document.getElementById('admin-batch-wrapper');
+  if (toggleBatchBtn && batchWrapper) {
+    toggleBatchBtn.onclick = () => {
+      batchWrapper.classList.toggle('hidden');
+    };
+  }
+
+  // 後臺：儲存批次名冊
+  const saveBatchBtn = document.getElementById('admin-btn-save-batch');
+  const batchTextarea = document.getElementById('admin-batch-textarea');
+  if (saveBatchBtn && batchTextarea) {
+    saveBatchBtn.onclick = () => {
+      const lines = batchTextarea.value.split(/[\n,，]+/).map(s => s.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        alert('班級名冊不能為空！請至少輸入一個班級名稱。');
+        return;
+      }
+      window.cloudSync.saveClassList(lines);
+      window.renderAdminClassTags();
+      if (batchWrapper) batchWrapper.classList.add('hidden');
+      alert(`✅ 班級清單已更新！目前下拉選單共有 ${window.cloudSync.classList.length} 個班級。`);
+    };
+  }
+
+  // 後臺：還原全校預設
+  const resetClassesBtn = document.getElementById('admin-btn-reset-classes');
+  if (resetClassesBtn) {
+    resetClassesBtn.onclick = () => {
+      if (confirm('確定要還原為溪洲國小預設班級清單（1~6年級各班）嗎？')) {
+        window.cloudSync.resetClassList();
+        window.renderAdminClassTags();
+        alert('✅ 已成功還原為全校預設班級！');
+      }
+    };
+  }
+
+  // 後臺：清除本機競賽紀錄
+  const clearLeaderBtn = document.getElementById('admin-btn-clear-leaderboard');
+  if (clearLeaderBtn) {
+    clearLeaderBtn.onclick = () => {
+      if (confirm('⚠️ 確定要清除本機累積的所有學生打字競賽紀錄嗎？\n此動作適合於新學期或新班級特訓前進行。')) {
+        localStorage.removeItem('typehero_local_leaderboard');
+        alert('✅ 本機排行榜紀錄已成功清空！');
+      }
+    };
+  }
 }
 
 // ----------------------------------------------------
