@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
+  <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
+  <link rel="stylesheet" href="css/styles.css">
+  
+  <!-- Firebase SDK (以官方相容 Web 版本載入，未連線時自動無痛切換本機安全模式) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+  <!-- 頂部導航欄 Header -->
+  <header>
+    <div class="header-container">
+      <div class="brand-section" onclick="location.reload()">
+        <div class="brand-logo">⌨️</div>
+        <div class="brand-text">
+          <h1>TypeHero 鍵盤英雄</h1>
+          <p>溪洲國小打字冒險學院 · 盲打肌肉記憶特訓</p>
+        </div>
+      </div>
+
+      <!-- 學生狀態欄 (等級、稱號、虛擬星幣) -->
+      <div class="user-stats-bar">
+        <div class="stat-pill pill-level" id="user-profile-badge" title="點擊設定班級與座號" style="cursor: pointer;">
+          <span id="user-avatar-display">🐱</span>
+          <span id="user-level-display">Lv.1</span>
+          <span id="user-title-display" style="font-size:0.75rem; color:var(--text-muted);">鍵盤見習生</span>
+        </div>
+
+        <div class="stat-pill pill-coins" id="user-coins-pill" title="我的星幣">
+          <span>🪙</span>
+          <span id="user-coins-display">100</span>
+          <span style="font-size: 0.7rem;">幣</span>
+        </div>
+      </div>
+
+      <!-- 右側工具列與按鈕 -->
+      <div class="header-actions">
+        <!-- 音效切換 -->
+        <button id="toggle-sound" class="btn-icon" title="切換按鍵音效">
+          <span id="sound-icon">🔊</span>
+        </button>
+
+        <!-- 商城按鈕 -->
+        <button id="nav-btn-shop" class="btn-icon" title="星幣外觀商城">
+          <span>🛍️</span>
+        </button>
+
+        <!-- 排行榜按鈕 -->
+        <button id="nav-btn-leaderboard" class="btn-icon" title="即時班級榮譽榜">
+          <span>🏆</span>
+        </button>
+
+        <!-- 選擇關卡快速錨點 -->
+        <a href="#lessons-panel" class="btn-primary" style="text-decoration: none;">
+          <span>關卡地圖</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主畫面區域 -->
+  <main>
+
+    <!-- 課程分類分頁標籤 (Tabs) -->
+    <div class="course-tabs-wrapper">
+      <div class="course-tabs">
+        <button class="course-tab-btn active" data-category="zhuyin">
+          <span>🇹🇼</span> 注音符號與聲調盲打 (15關)
+        </button>
+        <button class="course-tab-btn" data-category="chinese">
+          <span>📖</span> 中文生字詞與全形標點 (15關)
+        </button>
+        <button class="course-tab-btn" data-category="english">
+          <span>🔤</span> 國小英語標準盲打 (15關)
+        </button>
+      </div>
+
+      <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;">
+        <span>💡 秘訣：打中文時請切換為「注音輸入法」選字；注音與英文盲打可直接敲擊實體鍵！準確率需達 70% 才能通關喔！</span>
+      </div>
+    </div>
+
+    <!-- 打字即時儀表板 (Stats Dashboard) -->
+    <div class="stats-dashboard">
+      <!-- 當前關卡 -->
+      <div class="stat-box">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+          <span>🎯</span>
+        </div>
+        <div class="stat-content">
+          <span class="stat-title">當前挑戰關卡</span>
+          <span id="stat-lesson-title" class="stat-val" style="font-size:1.05rem;">1. 食指初探</span>
+        </div>
+      </div>
+
+      <!-- 即時打字速度 WPM -->
+      <div class="stat-box">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+          <span>⚡</span>
+        </div>
+        <div class="stat-content">
+          <span class="stat-title">打字速度 (每分鐘字數 WPM)</span>
+          <div style="display:flex; align-items:baseline; gap:4px;">
+            <span id="stat-wpm" class="stat-val">0</span>
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:bold;">字/分</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 準確率 -->
+      <div class="stat-box">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+          <span>🎯</span>
+        </div>
+        <div class="stat-content">
+          <span class="stat-title">擊鍵準確率</span>
+          <span id="stat-accuracy" class="stat-val">100%</span>
+        </div>
+      </div>
+
+      <!-- 關卡進度條與連擊 -->
+      <div class="stat-box" style="flex-direction: column; justify-content: center; gap: 0.4rem;">
+        <div style="display: flex; justify-content: space-between; width: 100%; font-size: 0.75rem; font-weight: bold;">
+          <span style="color: var(--text-muted);">關卡完成進度</span>
+          <span id="stat-progress-text" style="color: var(--brand-primary);">0%</span>
+        </div>
+        <div style="background: var(--bg-secondary); height: 8px; border-radius: 9999px; overflow: hidden; width: 100%;">
+          <div id="stat-progress-bar" style="background: linear-gradient(90deg, var(--brand-primary), #6366f1); height: 100%; width: 0%; border-radius: 9999px; transition: width 0.15s ease;"></div>
+        </div>
+
+        <!-- 連擊動態徽章 -->
+        <div class="combo-badge-wrapper" id="combo-badge-wrapper"></div>
+      </div>
+    </div>
+
+    <!-- 核心打字舞台 (Typing Arena) -->
+    <div class="typing-arena" id="typing-arena">
+      <!-- 隱藏式真實輸入框 (使微軟注音等所有中文輸入法能正常呼叫與組字) -->
+      <input type="text" id="typing-input" class="typing-hidden-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" autofocus>
+
+      <!-- 頂部模式標章與重來按鈕 -->
+      <div class="stage-top-meta">
+        <div class="lesson-badge" id="stage-mode-badge">
+          <span>🇹🇼 台灣大千注音盲打特訓</span>
+        </div>
+        <button id="btn-restart-lesson" class="btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
+          <span>🔄 重來</span>
+        </button>
+      </div>
+
+      <!-- 打字文字展示區 -->
+      <div class="typing-stream" id="typing-stream">
+        <!-- 由 JavaScript 動態注入字元 -->
+      </div>
+
+      <!-- 注音輸入法組字中即時預覽條 -->
+      <div id="ime-preview-badge" class="ime-preview-badge hidden">
+        <span class="ime-preview-label">輸入法組字中：</span>
+        <span id="ime-preview-text" class="ime-preview-text"></span>
+      </div>
+
+      <!-- 點擊開始打字遮罩 (Focus Guard) -->
+      <div id="focus-alert" class="focus-guard">
+        <div class="focus-card">
+          <div class="focus-icon">⌨️</div>
+          <h3 style="font-size: 1.15rem; font-weight: 800; margin-bottom: 0.35rem;">點擊此處啟動打字冒險</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">系統準備就緒！支援微軟注音輸入法或直接敲擊實體鍵！</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 雙語虛擬鍵盤與全覆蓋半透明指法引導層 (Bilingual Keyboard with Transparent Hands Overlay) -->
+    <div class="guide-layout">
+      <div class="keyboard-box">
+        <!-- 鍵盤頂部指法動態引導 HUD 與透明度調節列 -->
+        <div class="keyboard-top-toolbar">
+          <div class="keyboard-finger-hud" id="keyboard-finger-hud">
+            <div class="hud-finger-badge" id="hud-finger-badge">
+              <span id="hud-hand-icon">🖐️</span>
+              <span id="hud-finger-name">準備中</span>
+            </div>
+            <div class="hud-action-hint" id="hud-action-hint">
+              請敲擊目標按鍵開始特訓
+            </div>
+          </div>
+
+          <div class="opacity-control-wrapper">
+            <span class="opacity-label">動態指法透明度：</span>
+            <input type="range" id="guide-opacity-slider" min="20" max="100" value="65" step="5" title="調整半透明手指指法透明度">
+            <span id="guide-opacity-val" class="opacity-val-badge">65%</span>
+            <div class="opacity-presets">
+              <button type="button" class="btn-preset-opacity" data-val="35">輕柔 35%</button>
+              <button type="button" class="btn-preset-opacity active" data-val="65">清晰 65%</button>
+              <button type="button" class="btn-preset-opacity" data-val="85">鮮明 85%</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="keyboard-rows-container" id="keyboard-rows-container">
+          <!-- 由 JavaScript 自動排版雙語鍵盤按鍵 -->
+          
+          <!-- 半透明十指擬真人體工學打字指法動態引導層 (Transparent Hands Overlay) -->
+          <div id="hands-overlay-wrapper" class="hands-overlay-wrapper">
+            <svg id="hands-overlay-svg" class="hands-overlay-svg" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <!-- 柔和膚色漸層 (通透半透明，可清晰透視底層鍵盤英數與注音) -->
+                <linearGradient id="skin-gradient-palm" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#fed7aa" stop-opacity="0.65" />
+                  <stop offset="100%" stop-color="#fdba74" stop-opacity="0.58" />
+                </linearGradient>
+                <linearGradient id="skin-gradient-finger" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#ffedd5" stop-opacity="0.70" />
+                  <stop offset="60%" stop-color="#fed7aa" stop-opacity="0.62" />
+                  <stop offset="100%" stop-color="#fdba74" stop-opacity="0.55" />
+                </linearGradient>
+                <!-- 擊鍵目標手指高亮微紅發光漸層 -->
+                <linearGradient id="skin-gradient-active" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#fecdd3" stop-opacity="0.85" />
+                  <stop offset="70%" stop-color="#f87171" stop-opacity="0.75" />
+                  <stop offset="100%" stop-color="#ef4444" stop-opacity="0.70" />
+                </linearGradient>
+              </defs>
+              <g id="hands-layer-palms"></g>
+              <g id="hands-layer-fingers"></g>
+              <g id="hands-layer-beacons"></g>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 關卡冒險地圖面板 (Lessons Panel) -->
+    <section class="map-section" id="lessons-panel">
+      <div class="map-header">
+        <h2 class="map-title">
+          <span>🗺️ 關卡循序冒險地圖</span>
+        </h2>
+        <span style="font-size: 0.78rem; color: var(--text-muted);">循序漸進解鎖：由 2 顆鍵進化至大師境界</span>
+      </div>
+
+      <div class="lessons-grid" id="lessons-grid">
+        <!-- 關卡卡片由 JavaScript 自動填入 -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==========================================================================
+       彈窗模態框 Modals
+       ========================================================================== -->
+
+  <!-- 1. 結算榮譽證書彈窗 (Result Modal) -->
+  <div class="modal-backdrop" id="modal-result">
+    <div class="modal-sheet">
+      <div class="modal-rainbow-bar" id="modal-result-banner"></div>
+      <div class="modal-content">
+        <div class="modal-icon-badge" id="modal-result-icon">🏆</div>
+        <h3 id="modal-result-title" style="font-size: 1.45rem; font-weight: 800; margin-bottom: 0.35rem;">關卡挑戰成功！</h3>
+        <p id="modal-lesson-title" style="font-size: 0.85rem; color: var(--text-muted);">1. 食指初探</p>
+
+        <!-- 星星動畫 -->
+        <div class="stars-celebration" id="modal-stars-celebration">
+          <span>★</span><span>★</span><span>★</span>
+        </div>
+
+        <!-- 通關評價或未達標警示訊息 -->
+        <div id="modal-feedback-msg" class="modal-feedback-msg"></div>
+
+        <!-- 數據統計 -->
+        <div class="modal-stats-grid">
+          <div class="modal-stat-item">
+            <span class="modal-stat-label">打字速度 (每分鐘字數 WPM)</span>
+            <span class="modal-stat-num" id="modal-wpm">0 字/分 (WPM)</span>
+          </div>
+          <div class="modal-stat-item">
+            <span class="modal-stat-label">擊鍵準確率</span>
+            <span class="modal-stat-num" id="modal-accuracy" style="color: #10b981;">100%</span>
+          </div>
+          <div class="modal-stat-item">
+            <span class="modal-stat-label">獲得獎勵</span>
+            <span class="modal-stat-num" id="modal-coins" style="color: #fbbf24;">+30 幣</span>
+          </div>
+        </div>
+
+        <div class="modal-buttons-row">
+          <button id="modal-btn-retry" class="btn-secondary">
+            <span>🔄 重來一次</span>
+          </button>
+          <button id="modal-btn-next" class="btn-primary" style="flex: 1.2; justify-content: center;">
+            <span>下一關卡 ➔</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 星幣外觀商城彈窗 (Shop Modal) -->
+  <div class="modal-backdrop" id="modal-shop">
+    <div class="modal-sheet" style="max-width: 680px;">
+      <div class="modal-rainbow-bar"></div>
+      <div class="modal-content" style="align-items: stretch; text-align: left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h3 style="font-size: 1.25rem; font-weight: 800;">🛍️ TypeShop 星幣外觀商城</h3>
+          <button class="btn-icon" id="close-shop-btn" style="width: 36px; height: 36px; font-size: 1.1rem;">✕</button>
+        </div>
+
+        <div class="shop-tabs">
+          <button class="shop-tab-btn active" data-tab="skins">🎨 鍵盤外觀</button>
+          <button class="shop-tab-btn" data-tab="sounds">🎵 擊鍵音效</button>
+          <button class="shop-tab-btn" data-tab="avatars">🐱 角色頭像</button>
+        </div>
+
+        <div class="shop-items-container" id="shop-items-container">
+          <!-- 由 JavaScript 動態注入商品項目 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 即時班級榮譽榜彈窗 (Leaderboard Modal) -->
+  <div class="modal-backdrop" id="modal-leaderboard">
+    <div class="modal-sheet" style="max-width: 560px;">
+      <div class="modal-rainbow-bar"></div>
+      <div class="modal-content" style="align-items: stretch; text-align: left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h3 style="font-size: 1.25rem; font-weight: 800;">🏆 溪洲國小打字英雄榜</h3>
+          <button class="btn-icon" id="close-leader-btn" style="width: 36px; height: 36px; font-size: 1.1rem;">✕</button>
+        </div>
+
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:1rem;">
+          實時記錄全校與班級學生的打字最高速度（每分鐘字數 WPM）與準確率！
+        </p>
+
+        <div class="leaderboard-list" id="leaderboard-list">
+          <!-- 由 JavaScript 動態填入排行榜資料 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 學生班級座號設定彈窗 (Profile Modal) -->
+  <div class="modal-backdrop" id="modal-profile">
+    <div class="modal-sheet" style="max-width: 480px;">
+      <div class="modal-rainbow-bar"></div>
+      <div class="modal-content" style="align-items: stretch; text-align: left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h3 style="font-size: 1.25rem; font-weight: 800;">👤 個人與班級雲端設定</h3>
+          <button class="btn-icon" id="close-profile-btn" style="width: 36px; height: 36px; font-size: 1.1rem;">✕</button>
+        </div>
+
+        <div class="profile-avatar-showcase">
+          <div class="profile-avatar-sticker" id="profile-modal-avatar">🐱</div>
+          <div class="profile-avatar-tag">目前冒險英雄頭像</div>
+        </div>
+
+        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:1.25rem; text-align: center;">
+          在學校電腦教室使用時，填妥班級與座號即可隨時同步雲端進度與排行榜！
+        </p>
+
+        <div style="display:flex; flex-direction:column; gap:0.85rem; margin-bottom:1.5rem;">
+          <div>
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.25rem;">所屬班級</label>
+            <input type="text" id="input-class-name" placeholder="例如：5年3班" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border-color); background:var(--bg-secondary); color:var(--text-main); font-size:0.85rem;">
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.25rem;">學生座號</label>
+            <input type="text" id="input-seat-num" placeholder="例如：18" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border-color); background:var(--bg-secondary); color:var(--text-main); font-size:0.85rem;">
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.25rem;">我的暱稱</label>
+            <input type="text" id="input-nickname" placeholder="例如：神速小杰" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border-color); background:var(--bg-secondary); color:var(--text-main); font-size:0.85rem;">
+          </div>
+        </div>
+
+        <button id="save-profile-btn" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.75rem;">
+          儲存並同步至雲端
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 頁尾 Footer -->
+  <footer>
+    <div>© 2026 TypeHero 鍵盤英雄 · 專為溪洲國小學童設計之打字冒險學院 · 支援 100% 離線執行與班級雲端排行榜</div>
+  </footer>
+
+  <!-- 核心模組腳本載入 -->
+  <script src="js/audio.js"></script>
+  <script src="js/lessons.js"></script>
+  <script src="js/shop.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
