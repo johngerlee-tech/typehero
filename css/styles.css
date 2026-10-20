@@ -256,20 +256,42 @@ header {
   100% { transform: scale(1.08); }
 }
 
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: max-content;
+}
+
 .brand-text h1 {
   font-family: var(--font-display);
   font-size: 1.45rem;
-  font-weight: 700;
-  letter-spacing: -0.5px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
   background: linear-gradient(90deg, var(--text-main), var(--brand-primary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  margin: 0;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
-.brand-text p {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  font-weight: 500;
+/* 需求 1: 調整成「溪洲國小打字冒險學院」，並放大字體左右切齊 TypeHero 鍵盤英雄 */
+.brand-text p,
+.brand-subtitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--brand-primary);
+  margin: 3px 0 0 0;
+  line-height: 1.2;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+  letter-spacing: normal;
+  text-align: justify;
+  text-align-last: justify;
 }
 
 /* 學生狀態欄 (等級、經驗值、星幣) */
@@ -318,17 +340,78 @@ header {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(56, 189, 248, 0.25));
   border-color: var(--border-glow);
   color: var(--brand-primary);
+  padding: 0.35rem 0.95rem;
+}
+
+.user-profile-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  min-width: 0;
+}
+
+.user-profile-line-1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.user-profile-line-2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.user-name-display {
+  color: var(--text-main);
+  font-weight: 700;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-student-tag {
   background: rgba(56, 189, 248, 0.2);
   color: var(--brand-primary);
-  padding: 0.15rem 0.55rem;
+  padding: 0.12rem 0.5rem;
   border-radius: var(--radius-full);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 800;
   border: 1px solid var(--border-glow);
   white-space: nowrap;
+}
+
+.profile-locked-box {
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.95rem;
+}
+
+.custom-class-dropdown {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--brand-primary);
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  outline: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.custom-class-dropdown:hover,
+.custom-class-dropdown:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 10px var(--brand-glow);
 }
 
 .pill-coins {
@@ -350,6 +433,7 @@ header {
   96% { transform: rotate(15deg); }
 }
 
+/* 需求 2: 雲端連線指示燈，禁止斷行 (white-space: nowrap) */
 .pill-cloud {
   background: rgba(56, 189, 248, 0.12);
   border-color: rgba(56, 189, 248, 0.3);
@@ -358,6 +442,11 @@ header {
   padding: 0.35rem 0.85rem;
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .pill-cloud:hover {
@@ -2291,5 +2380,57 @@ footer {
 .achievement-toast.show {
   transform: translateY(0);
   opacity: 1;
+}
+
+/* 頁尾樣式 (需求 2: 版權標示與連結字體放大，比選單分類名稱 0.88rem 再大一級) */
+footer {
+  border-top: 1px solid var(--border-color);
+  padding: 1.6rem 1rem;
+  margin-top: 2.5rem;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.footer-copyright {
+  font-size: 1.05rem; /* 比選單分類名稱 0.88rem 明顯再大一級，清晰大字 */
+  color: var(--text-main);
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.footer-links {
+  font-size: 1.0rem; /* 比選單分類名稱 0.88rem 再大一級 */
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  font-weight: 800;
+}
+
+.footer-links a {
+  color: var(--brand-primary);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-sm);
+}
+
+.footer-links a:hover {
+  color: #fff;
+  background: rgba(56, 189, 248, 0.2);
+  box-shadow: 0 0 12px var(--brand-glow);
+  transform: translateY(-1px);
 }
 

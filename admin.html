@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeHero 教學管理與教師後臺系統 - 溪洲國小打字冒險學院</title>
+  <meta name="description" content="TypeHero 鍵盤英雄 教師專屬管理後臺：提供 Google 帳號身分驗證、分班課堂自訂生字詞發布、學生密碼查閱與重設、全校班級設定與雲端連線診斷。">
+  <link rel="stylesheet" href="css/styles.css?v=2.4">
+  
+  <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+  <style>
+    /* 後臺專屬滿版排版樣式 */
+    body.admin-body {
+      background: radial-gradient(circle at 50% 10%, #1e1b4b 0%, #0f172a 60%, #020617 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      color: var(--text-main);
+      padding: 0;
+      margin: 0;
+      overflow-x: hidden;
+    }
+
+    .admin-header {
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.85rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .admin-header-inner {
+      max-width: 1300px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .admin-main-container {
+      max-width: 1300px;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem 3rem 1.5rem;
+      width: 100%;
+      box-sizing: border-box;
+      flex: 1;
+    }
+
+    .admin-auth-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem;
+      max-width: 620px;
+      margin: 2.5rem auto;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), 0 0 30px var(--brand-glow);
+      text-align: center;
+    }
+
+    .admin-workspace-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    @media (max-width: 1024px) {
+      .admin-workspace-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .admin-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      position: relative;
+    }
+
+    .admin-card.locked-card {
+      opacity: 0.72;
+      border-color: rgba(148, 163, 184, 0.25);
+    }
+
+    .admin-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .admin-card-title {
+      font-size: 1.12rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .role-badge.teacher {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .role-badge.admin {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(251, 191, 36, 0.45);
+    }
+
+    .permission-lock-notice {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .students-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      text-align: left;
+    }
+
+    .students-table th {
+      background: rgba(15, 23, 42, 0.6);
+      padding: 0.65rem 0.85rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 700;
+    }
+
+    .students-table td {
+      padding: 0.65rem 0.85rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+    }
+
+    .students-table tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .pwd-code-badge {
+      background: rgba(148, 163, 184, 0.12);
+      padding: 0.18rem 0.55rem;
+      border-radius: 4px;
+      font-family: monospace;
+      font-weight: bold;
+      color: #fbbf24;
+      border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+  </style>
+</head>
+<body class="admin-body">
+
+  <!-- 頂部導覽列 -->
+  <header class="admin-header">
+    <div class="admin-header-inner">
+      <div style="display:flex; align-items:center; gap:0.85rem;">
+        <span style="font-size: 1.8rem; line-height: 1;">⚙️</span>
+        <div>
+          <h1 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: #fff;">
+            TypeHero 教學管理與教師後臺系統
+          </h1>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin: 2px 0 0 0;">
+            溪洲國小打字冒險學院 · 教師專屬分班生字詞發布與學生通行密碼管理
+          </p>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:0.85rem;">
+        <!-- 使用者目前身分指示 -->
+        <div id="admin-user-info-pill" style="display:none; align-items:center; gap:0.6rem;">
+          <img id="admin-user-avatar" src="" alt="頭像" style="width:32px; height:32px; border-radius:50%; display:none; border:2px solid var(--brand-primary);">
+          <div style="text-align:right;">
+            <div id="admin-user-name" style="font-size:0.85rem; font-weight:bold; color:var(--text-main);">授課教師</div>
+            <div id="admin-user-email" style="font-size:0.7rem; color:var(--text-muted);">teacher@school.edu.tw</div>
+          </div>
+          <span id="admin-user-role-badge" class="role-badge teacher">🏫 授課教師</span>
+          <button id="admin-btn-logout" class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.75rem;">
+            🚪 登出
+          </button>
+        </div>
+
+        <!-- 返回學生練習主頁按鈕 -->
+        <a href="index.html" class="btn-primary" style="text-decoration:none; font-size:0.85rem; padding:0.5rem 1rem;">
+          <span>🎒 返回打字學院</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主畫面區域 -->
+  <main class="admin-main-container">
+
+    <!-- 1. 身分驗證入口 (未登入時呈現) -->
+    <div id="admin-login-view" class="admin-auth-card">
+      <div style="font-size: 3rem; margin-bottom: 0.75rem;">🔐</div>
+      <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.4rem; color: #fff;">
+        請選擇身分登入後臺系統
+      </h2>
+      <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.75rem; line-height: 1.5;">
+        本系統提供全校授課教師使用 Google 帳號快速登入發布班級特訓與查詢學生密碼；亦提供系統最高管理員維護全校班級名單。
+      </p>
+
+      <div style="display:flex; flex-direction:column; gap:1.25rem; max-width:420px; margin:0 auto;">
+        <!-- 途徑 A: Google 帳號登入 (需求 7: 本校老師註冊與登入) -->
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-md); padding: 1.25rem;">
+          <h4 style="font-size: 0.95rem; font-weight: 800; color: #34d399; margin: 0 0 0.4rem 0;">
+            🏫 本校教師快速登入 / 註冊
+          </h4>
+          <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 0.85rem;">
+            使用 Google 帳號授權登入（支援教育部帳號及 Gmail），登入後即可發布指定班級生字詞與協助學生修改密碼！
+          </p>
+          <button id="btn-google-login" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.75rem; background: linear-gradient(135deg, #10b981, #059669); font-size: 0.95rem;">
+            <span>🌐 使用 Google 帳號登入 / 註冊</span>
+          </button>
+          <!-- 離線 / 本機測試輔助按鈕 (在不支援 Google 彈窗之本地 file:// 環境下無痛切換) -->
+          <button id="btn-mock-teacher-login" class="btn-secondary" style="width: 100%; justify-content: center; padding: 0.45rem; font-size: 0.75rem; margin-top: 0.5rem; border-color: rgba(16, 185, 129, 0.3);">
+            🏫 教師身分免 Google 登入 (本機離線體驗)
+          </button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:0.75rem; color:var(--text-muted); font-size:0.75rem;">
+          <div style="flex:1; height:1px; background:var(--border-color);"></div>
+          <span>或以管理密碼登入</span>
+          <div style="flex:1; height:1px; background:var(--border-color);"></div>
+        </div>
+
+        <!-- 途徑 B: 最高管理員密碼登入 -->
+        <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: var(--radius-md); padding: 1.25rem;">
+          <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--brand-primary); margin: 0 0 0.4rem 0;">
+            👑 系統最高管理員登入
+          </h4>
+          <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 0.85rem;">
+            具備修改全校班級名稱清單與清空排行榜之最高權限。（預設密碼：1234）
+          </p>
+          <form id="form-admin-pwd-login" onsubmit="return false;" style="display:flex; gap:0.5rem;">
+            <input type="password" id="input-admin-pwd-login" class="form-input" placeholder="請輸入管理密碼 (預設 1234)" style="flex:1;" required>
+            <button type="submit" id="btn-submit-pwd-login" class="btn-primary" style="padding:0.65rem 1.2rem; flex-shrink:0;">
+              登入 ➔
+            </button>
+          </form>
+          <div id="login-pwd-error" style="color:#ef4444; font-size:0.75rem; font-weight:bold; display:none; margin-top:0.4rem; text-align:left;">
+            ❌ 密碼錯誤，請重新輸入！
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 後臺主功能工作區 (登入後解鎖呈現) -->
+    <div id="admin-workspace" style="display:none;">
+
+      <!-- 頂部即時診斷條 -->
+      <div class="admin-card" style="margin-bottom: 1.5rem; background: rgba(56, 189, 248, 0.06); border-color: rgba(56, 189, 248, 0.35);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.85rem;">
+          <div style="display:flex; align-items:center; gap:0.65rem;">
+            <span style="font-size:1.6rem;">☁️</span>
+            <div>
+              <div style="font-size:0.92rem; font-weight:800; color:#38bdf8;">
+                Firebase 雲端資料庫狀態與連線診斷
+              </div>
+              <div id="admin-db-ping-status" style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+                正在連線至 Firebase Firestore 測試伺服器...
+              </div>
+            </div>
+          </div>
+          <button id="admin-btn-ping" class="btn-primary" style="font-size:0.8rem; padding:0.4rem 1rem;">
+            🔄 重新診斷連線
+          </button>
+        </div>
+      </div>
+
+      <!-- 核心功能網格 -->
+      <div class="admin-workspace-grid">
+
+        <!-- 卡片 1: 課堂自訂特訓題目發布 (需求 5 & 7) -->
+        <div class="admin-card" style="border-color: rgba(16, 185, 129, 0.4);">
+          <div class="admin-card-header">
+            <div class="admin-card-title" style="color:#34d399;">
+              <span>📝</span> 發布今日課堂自訂特訓 (自訂生字詞/每週一詞)
+            </div>
+            <span class="role-badge teacher">教師完全可用</span>
+          </div>
+
+          <p style="font-size:0.76rem; color:var(--text-muted); margin-bottom:1rem; line-height:1.4;">
+            老師可在此發布「全校共用」或「指定班級專屬」的當週國語生字詞與短句！發布後，學生端選擇所屬班級即可立即展開練習！
+          </p>
+
+          <div style="display:flex; flex-direction:column; gap:0.85rem;">
+            <!-- 需求 5: 發布目標班級下拉選單 -->
+            <div>
+              <label for="admin-custom-target-class" style="font-size:0.82rem; font-weight:bold; display:block; margin-bottom:0.35rem;">
+                🎯 選擇欲發布的班級特訓 (下拉選單)
+              </label>
+              <select id="admin-custom-target-class" class="form-select" style="font-size:0.88rem; font-weight:700;">
+                <option value="all">🌐 全校所有班級 (共用特訓)</option>
+                <!-- 由 JS 動態注入所有班級 -->
+              </select>
+            </div>
+
+            <div>
+              <label for="admin-custom-title" style="font-size:0.82rem; font-weight:bold; display:block; margin-bottom:0.35rem;">
+                📌 特訓主題名稱
+              </label>
+              <input type="text" id="admin-custom-title" class="form-input" placeholder="例如：國語第四課生字複習 或 每週一詞" maxlength="30">
+            </div>
+
+            <div>
+              <label for="admin-custom-text" style="font-size:0.82rem; font-weight:bold; display:block; margin-bottom:0.35rem;">
+                ✍️ 練習內容文字 (生字詞、短文或全形標點)
+              </label>
+              <textarea id="admin-custom-text" class="form-textarea" rows="4" placeholder="請輸入欲讓學生練習的字詞或句子 (例如：春風吹拂，綠草如茵。小鳥在枝頭快樂地歌唱！)"></textarea>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.3rem;">
+                <span id="admin-custom-char-count" style="font-size:0.72rem; color:var(--text-muted);">字數統計：0 字</span>
+                <span style="font-size:0.72rem; color:var(--brand-primary);">💡 支援免切換英數模式直接流暢盲打！</span>
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.4rem;">
+              <button id="admin-btn-clear-custom" class="btn-secondary" style="font-size:0.8rem; padding:0.45rem 1rem; color:#f87171;">
+                🗑️ 清空此班特訓
+              </button>
+              <button id="admin-btn-save-custom" class="btn-primary" style="font-size:0.85rem; padding:0.5rem 1.25rem; background:linear-gradient(135deg, #10b981, #059669);">
+                🚀 發布為今日特訓
+              </button>
+            </div>
+          </div>
+
+          <!-- 已發布特訓總覽卡片 -->
+          <div style="margin-top:1.25rem; border-top:1px solid var(--border-color); padding-top:0.85rem;">
+            <div style="font-size:0.8rem; font-weight:bold; margin-bottom:0.5rem; display:flex; justify-content:space-between; align-items:center;">
+              <span>📋 目前已發布班級特訓清單</span>
+              <button id="admin-btn-refresh-lessons" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.5rem;">🔄 重新整理</button>
+            </div>
+            <div id="admin-published-lessons-list" style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:0.4rem; font-size:0.75rem;">
+              <div style="color:var(--text-muted); text-align:center; padding:0.5rem;">讀取中...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 卡片 2: 班級學生帳號與通行密碼管理 (需求 7: 查閱密碼與協助修改) -->
+        <div class="admin-card" style="border-color: rgba(99, 102, 241, 0.4);">
+          <div class="admin-card-header">
+            <div class="admin-card-title" style="color:var(--brand-primary);">
+              <span>👥</span> 學生帳號與通行密碼管理 (防止冒用/重設密碼)
+            </div>
+            <span class="role-badge teacher">教師完全可用</span>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <label for="admin-student-class-select" style="font-size:0.82rem; font-weight:bold;">班級篩選：</label>
+              <select id="admin-student-class-select" class="form-select" style="font-size:0.82rem; padding:0.3rem 0.65rem; width:auto;">
+                <!-- 班級選項 -->
+              </select>
+            </div>
+            <div style="display:flex; gap:0.4rem;">
+              <button id="admin-btn-toggle-show-pwd" class="btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.65rem;">
+                👁️ 顯示/隱藏密碼
+              </button>
+              <button id="admin-btn-refresh-students" class="btn-primary" style="font-size:0.75rem; padding:0.3rem 0.75rem;">
+                🔄 重新整理名冊
+              </button>
+            </div>
+          </div>
+
+          <p style="font-size:0.74rem; color:var(--text-muted); margin-bottom:0.75rem;">
+            若學生忘記密碼或換電腦無法登入，老師可在此查閱學生密碼或點擊「修改」為學生重設新密碼：
+          </p>
+
+          <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: rgba(15, 23, 42, 0.5);">
+            <table class="students-table">
+              <thead>
+                <tr>
+                  <th style="width: 55px;">座號</th>
+                  <th>學生暱稱</th>
+                  <th style="width: 65px;">等級</th>
+                  <th style="width: 80px;">星幣</th>
+                  <th>通行密碼</th>
+                  <th style="width: 80px; text-align:center;">操作</th>
+                </tr>
+              </thead>
+              <tbody id="admin-students-table-body">
+                <tr>
+                  <td colspan="6" style="text-align:center; padding:1.5rem; color:var(--text-muted);">
+                    請選擇班級或點擊「重新整理名冊」載入學生名冊...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 卡片 3: 學校班級清單基本設定 (基本系統設定，教師身分不可修改，需求 7) -->
+        <div id="card-class-settings" class="admin-card">
+          <div class="admin-card-header">
+            <div class="admin-card-title">
+              <span>🏫</span> 學校班級清單維護 (基本系統設定)
+            </div>
+            <span id="badge-class-settings-role" class="role-badge admin">👑 僅限最高管理員</span>
+          </div>
+
+          <!-- 教師鎖定警示提示條 -->
+          <div id="notice-class-locked" class="permission-lock-notice" style="display:none;">
+            <span>🔒</span> 授課教師身分：學校班級名稱清單為全校基本設定，不可修改。
+          </div>
+
+          <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+            <input type="text" id="admin-new-class-input" class="form-input" placeholder="例如：5年4班 或 資訊研習A" style="flex:1;">
+            <button id="admin-add-class-btn" class="btn-primary" style="padding:0.55rem 1rem; flex-shrink:0;">
+              ➕ 新增單一班級
+            </button>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+            <label style="font-size:0.82rem; font-weight:bold;">
+              📋 目前班級標籤 (<span id="admin-class-count">0</span> 個班級)
+            </label>
+            <div style="display:flex; gap:0.4rem;">
+              <button id="admin-btn-toggle-batch" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.6rem;">
+                📝 批次文字編輯
+              </button>
+              <button id="admin-btn-reset-classes" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.6rem; color:#f87171;">
+                🔄 還原全校預設
+              </button>
+            </div>
+          </div>
+
+          <!-- 標籤容器 -->
+          <div id="admin-class-tags-container" class="admin-class-tags-container" style="max-height:180px; overflow-y:auto; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+            <!-- JS 動態注入 -->
+          </div>
+
+          <!-- 批次編輯展開區 -->
+          <div id="admin-batch-wrapper" class="hidden" style="margin-top:0.75rem;">
+            <p style="font-size:0.72rem; color:var(--text-muted); margin-bottom:0.35rem;">
+              每行輸入一個班級名稱，直接貼上年級清單即可批次覆蓋：
+            </p>
+            <textarea id="admin-batch-textarea" class="form-textarea" rows="4"></textarea>
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.4rem;">
+              <button id="admin-btn-save-batch" class="btn-primary" style="font-size:0.78rem; padding:0.35rem 0.85rem;">
+                💾 儲存批次名冊
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 卡片 4: 系統安全與排行榜維護 (教師身分不可清空紀錄，需求 7) -->
+        <div id="card-security-settings" class="admin-card">
+          <div class="admin-card-header">
+            <div class="admin-card-title">
+              <span>🧹</span> 排行榜紀錄重設與管理員密碼維護
+            </div>
+            <span id="badge-security-role" class="role-badge admin">👑 僅限最高管理員</span>
+          </div>
+
+          <!-- 教師鎖定警示提示條 -->
+          <div id="notice-security-locked" class="permission-lock-notice" style="display:none;">
+            <span>🔒</span> 授課教師身分：清空全校紀錄與修改管理主密碼僅限「最高管理員」操作。
+          </div>
+
+          <!-- 清空排行榜 -->
+          <div style="margin-bottom:1.25rem; padding-bottom:1rem; border-bottom:1px solid var(--border-color);">
+            <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:0.35rem;">
+              🗑️ 全校競賽與排行榜紀錄重設
+            </label>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.85rem;">
+              <span style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
+                新學期開學或舉辦新競賽時，可清除全校累積排行榜紀錄：
+              </span>
+              <button id="admin-btn-clear-leaderboard" class="btn-secondary" style="font-size:0.78rem; padding:0.45rem 0.95rem; color:#f87171; border-color:rgba(239,68,68,0.4); flex-shrink:0;">
+                🗑️ 清空全校排行榜
+              </button>
+            </div>
+          </div>
+
+          <!-- 修改管理員密碼 -->
+          <div>
+            <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:0.35rem;">
+              🔑 修改系統最高管理員密碼
+            </label>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <input type="password" id="admin-new-password" class="form-input" placeholder="請輸入新管理密碼" style="flex:1;">
+              <button id="admin-btn-save-password" class="btn-primary" style="padding:0.55rem 1rem; flex-shrink:0;">
+                💾 變更密碼
+              </button>
+            </div>
+            <span style="font-size:0.72rem; color:var(--text-muted); display:block; margin-top:0.3rem;">
+              目前最高管理密碼：<strong style="color:var(--brand-primary);" id="admin-current-pwd-hint">****</strong>
+            </span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- 頁尾 Footer -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-copyright">
+        © 2026 TypeHero 鍵盤英雄 · 專為溪洲國小學童設計之打字冒險學院 · 支援 100% 離線執行與班級雲端排行榜
+      </div>
+      <div class="footer-links">
+        <a href="index.html">
+          🎒 返回打字學院首頁
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 模組腳本載入 -->
+  <script src="js/firebase-config.js?v=2.4"></script>
+  <script src="js/admin.js?v=2.4"></script>
+</body>
+</html>

@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
-  <link rel="stylesheet" href="css/styles.css?v=2.3">
+  <link rel="stylesheet" href="css/styles.css?v=2.4">
   
-  <!-- Firebase SDK (以官方相容 Web 版本載入，未連線時自動無痛切換本機安全模式) -->
+  <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -20,17 +21,26 @@
         <div class="brand-logo">⌨️</div>
         <div class="brand-text">
           <h1>TypeHero 鍵盤英雄</h1>
-          <p>溪洲國小打字冒險學院 · 盲打肌肉記憶特訓</p>
+          <p class="brand-subtitle">
+            <span>溪</span><span>洲</span><span>國</span><span>小</span><span>打</span><span>字</span><span>冒</span><span>險</span><span>學</span><span>院</span>
+          </p>
         </div>
       </div>
 
-      <!-- 學生狀態欄 (等級、稱號、虛擬星幣) -->
+      <!-- 學生狀態欄 (等級、稱號、班級座號獨立行防擠壓、虛擬星幣) -->
       <div class="user-stats-bar">
-        <div class="stat-pill pill-level" id="user-profile-badge" title="點擊切換班級與座號" style="cursor: pointer;">
+        <div class="stat-pill pill-level" id="user-profile-badge" title="點擊修改暱稱與通關密碼" style="cursor: pointer;">
           <span id="user-avatar-display">🐱</span>
-          <span id="user-level-display">Lv.1</span>
-          <span id="user-title-display" style="font-size:0.75rem; color:var(--text-muted);">鍵盤見習生</span>
-          <span id="user-student-tag" class="user-student-tag">5年3班 18號</span>
+          <div class="user-profile-info-col">
+            <div class="user-profile-line-1">
+              <span id="user-level-display">Lv.1</span>
+              <span id="user-title-display">鍵盤見習生</span>
+            </div>
+            <div class="user-profile-line-2">
+              <span id="user-student-tag" class="user-student-tag">5年3班 18號</span>
+              <span id="user-name-display" class="user-name-display"></span>
+            </div>
+          </div>
         </div>
 
         <div class="stat-pill pill-coins" id="user-coins-pill" title="我的星幣">
@@ -39,7 +49,8 @@
           <span style="font-size: 0.7rem;">幣</span>
         </div>
 
-        <div class="stat-pill pill-cloud" id="cloud-status-pill" title="Firebase 雲端連線狀態 (點擊可開啟教師後臺檢視診斷)" style="cursor: pointer;">
+        <!-- 需求 2: 雲端連線指示 (保持單純 ☁️，white-space: nowrap 防止斷行) -->
+        <div class="stat-pill pill-cloud" id="cloud-status-pill" title="Firebase 雲端連線狀態" style="cursor: pointer;">
           <span id="cloud-status-icon">☁️</span>
           <span id="cloud-status-text">連線中...</span>
         </div>
@@ -72,8 +83,8 @@
           <span>🏆</span>
         </button>
 
-        <!-- 後臺管理按鈕 -->
-        <button id="nav-btn-admin" class="btn-icon" title="後臺班級參數管理">
+        <!-- 後臺管理按鈕 (需求 4: 跳出獨立新網頁 admin.html) -->
+        <button id="nav-btn-admin" class="btn-icon" title="教師與後臺管理系統 (新分頁開啟)" onclick="window.open('admin.html', '_blank')">
           <span>⚙️</span>
         </button>
 
@@ -100,10 +111,15 @@
         <button class="course-tab-btn" data-category="english">
           <span>🔤</span> 國小英語標準盲打 (15關)
         </button>
-        <!-- 教師課堂自訂特訓分頁 (Proposal VI.1) -->
-        <button class="course-tab-btn" id="tab-custom-lesson" data-category="custom" style="display:none;">
-          <span>⭐</span> 課堂自訂特訓
-        </button>
+        <!-- 教師課堂自訂特訓分頁 (需求 5: 附帶班級下拉選單) -->
+        <div class="custom-tab-container" id="custom-tab-container" style="display:none; align-items:center; gap:6px;">
+          <button class="course-tab-btn" id="tab-custom-lesson" data-category="custom">
+            <span>⭐</span> 課堂自訂特訓
+          </button>
+          <select id="custom-lesson-class-select" class="custom-class-dropdown" title="選擇班級自訂特訓題目">
+            <option value="all">🌐 全校共用</option>
+          </select>
+        </div>
       </div>
 
       <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;">
@@ -458,13 +474,13 @@
     </div>
   </div>
 
-  <!-- 4. 學生班級座號設定彈窗 (Profile Modal) -->
+  <!-- 4. 學生修改暱稱與密碼彈窗 (Profile Modal - 需求 3) -->
   <div class="modal-backdrop" id="modal-profile">
     <div class="modal-sheet" style="max-width: 480px;">
       <div class="modal-rainbow-bar"></div>
       <div class="modal-content" style="align-items: stretch; text-align: left;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-          <h3 style="font-size: 1.25rem; font-weight: 800;">👤 個人與班級雲端設定</h3>
+          <h3 style="font-size: 1.25rem; font-weight: 800;">👤 修改我的暱稱與通關密碼</h3>
           <button class="btn-icon" id="close-profile-btn" style="width: 36px; height: 36px; font-size: 1.1rem;">✕</button>
         </div>
 
@@ -473,27 +489,41 @@
           <div class="profile-avatar-tag">目前冒險英雄頭像</div>
         </div>
 
-        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:1.25rem; text-align: center;">
-          在學校電腦教室使用時，填妥班級與座號即可隨時同步雲端進度與排行榜！
-        </p>
-
         <div style="display:flex; flex-direction:column; gap:0.85rem; margin-bottom:1.5rem;">
-          <div>
-            <label for="input-class-name" style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.25rem;">所屬班級</label>
-            <select id="input-class-name" class="form-select"></select>
+          <!-- 班級與座號鎖定標籤 (防止學生在此直接切換他人班級與座號) -->
+          <div class="profile-locked-box" style="background: rgba(148, 163, 184, 0.08); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem 0.95rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">🔒 目前所屬班級與座號 (已鎖定)</span>
+              <span id="profile-modal-class-seat" style="font-weight:800; color:var(--brand-primary); font-size:0.95rem;">5年3班 18號</span>
+            </div>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin:0.35rem 0 0 0;">
+              💡 班級與座號不可在此任意切換；如需更換為其他學生身分，請點擊頁尾「🎒 切換學生身分」。
+            </p>
           </div>
+
+          <!-- 暱稱修改 -->
           <div>
-            <label for="input-seat-num" style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.25rem;">學生座號</label>
-            <input type="number" id="input-seat-num" min="1" max="60" placeholder="例如：18" class="form-input">
-          </div>
-          <div>
-            <label for="input-nickname" style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.25rem;">我的暱稱</label>
+            <label for="input-nickname" style="font-size:0.82rem; font-weight:bold; display:block; margin-bottom:0.3rem;">
+              <span>👤 我的冒險暱稱</span>
+            </label>
             <input type="text" id="input-nickname" placeholder="例如：神速小杰" class="form-input" maxlength="12">
+          </div>
+
+          <!-- 通關密碼修改 -->
+          <div>
+            <label for="input-profile-password" style="font-size:0.82rem; font-weight:bold; display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+              <span>🔑 修改學生通行密碼 (防冒用)</span>
+              <span style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">若不修改請留空</span>
+            </label>
+            <input type="password" id="input-profile-password" placeholder="請輸入新密碼 (留空則維持原密碼)" class="form-input" maxlength="20" autocomplete="new-password">
+            <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-top:0.25rem;">
+              💡 密碼將同步至雲端，換電腦時輸入此密碼即可快速還原星幣與等級！
+            </span>
           </div>
         </div>
 
-        <button id="save-profile-btn" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.75rem;">
-          儲存並同步至雲端
+        <button id="save-profile-btn" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.75rem; font-size: 0.95rem;">
+          💾 儲存修改並同步至雲端
         </button>
       </div>
     </div>
@@ -773,23 +803,29 @@
     </div>
   </div>
 
-  <!-- 頁尾 Footer -->
+  <!-- 頁尾 Footer (需求 2: 版權標示與連結字體放大，比選單分類名稱 0.88rem 再大一級) -->
   <footer>
-    <div style="display:flex; flex-direction:column; align-items:center; gap:0.4rem;">
-      <div>© 2026 TypeHero 鍵盤英雄 · 專為溪洲國小學童設計之打字冒險學院 · 支援 100% 離線執行與班級雲端排行榜</div>
-      <div style="font-size:0.72rem; color:var(--text-muted); display:flex; gap:1rem;">
-        <a href="javascript:void(0)" onclick="document.getElementById('modal-student-login').classList.add('active')" style="color:var(--brand-primary); text-decoration:none;">🎒 切換學生身分</a>
+    <div class="footer-inner">
+      <div class="footer-copyright">
+        © 2026 TypeHero 鍵盤英雄 · 專為溪洲國小學童設計之打字冒險學院 · 支援 100% 離線執行與班級雲端排行榜
+      </div>
+      <div class="footer-links">
+        <a href="javascript:void(0)" onclick="document.getElementById('modal-student-login').classList.add('active')">
+          🎒 切換學生身分
+        </a>
         <span>·</span>
-        <a href="javascript:void(0)" onclick="if(window.openAdminAuthModal) window.openAdminAuthModal();" style="color:var(--text-muted); text-decoration:none;">⚙️ 教師後臺管理</a>
+        <a href="admin.html" target="_blank">
+          ⚙️ 教師後臺管理 (新分頁)
+        </a>
       </div>
     </div>
   </footer>
 
   <!-- 核心模組腳本載入 (加入版本控制防止快取) -->
-  <script src="js/audio.js?v=2.3"></script>
-  <script src="js/lessons.js?v=2.3"></script>
-  <script src="js/shop.js?v=2.3"></script>
-  <script src="js/firebase-config.js?v=2.3"></script>
-  <script src="js/app.js?v=2.3"></script>
+  <script src="js/audio.js?v=2.4"></script>
+  <script src="js/lessons.js?v=2.4"></script>
+  <script src="js/shop.js?v=2.4"></script>
+  <script src="js/firebase-config.js?v=2.4"></script>
+  <script src="js/app.js?v=2.4"></script>
 </body>
 </html>
