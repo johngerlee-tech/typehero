@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
-  <link rel="stylesheet" href="css/styles.css?v=2.4">
+  <link rel="stylesheet" href="css/styles.css?v=2.5.3">
   
   <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -597,9 +597,15 @@
           </button>
         </form>
 
-        <div style="margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.85rem; font-size: 0.76rem; color: var(--text-muted);">
-          <span>💡 系統會自動記錄本堂課的打字進度</span>
-          <button type="button" id="login-admin-quicklink" class="btn-text-link" style="color: var(--brand-primary); cursor: pointer; background: none; border: none; font-size: 0.76rem; font-weight: 700;">
+        <div style="margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.85rem; font-size: 0.76rem; color: var(--text-muted); flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+            <span>💡 系統會自動記錄本堂課的打字進度</span>
+            <span style="color: var(--border-color); opacity: 0.6;">·</span>
+            <a href="admin.html" target="_blank" id="login-teacher-quicklink" class="teacher-login-link" title="前往教師管理與 Google 帳號登入系統 (新分頁開啟)">
+              <span>🧑‍🏫 教師登入</span>
+            </a>
+          </div>
+          <button type="button" id="login-admin-quicklink" class="btn-text-link" style="color: var(--text-muted); cursor: pointer; background: none; border: none; font-size: 0.76rem; font-weight: 600;" title="後臺班級名單與設定">
             ⚙️ 後臺班級設定
           </button>
         </div>
@@ -827,6 +833,6 @@
   <script src="js/lessons.js?v=2.5.2"></script>
   <script src="js/shop.js?v=2.5.2"></script>
   <script src="js/firebase-config.js?v=2.5.2"></script>
-  <script src="js/app.js?v=2.5.2"></script>
+  <script src="js/app.js?v=2.5.3"></script>
 </body>
 </html>
