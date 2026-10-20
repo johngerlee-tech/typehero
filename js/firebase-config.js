@@ -118,15 +118,20 @@ class CloudSyncManager {
     const titleEl = document.getElementById('user-title-display');
     const badgeEl = document.getElementById('user-profile-badge');
     const tagEl = document.getElementById('user-student-tag');
+    const nameEl = document.getElementById('user-name-display');
+
     if (tagEl && this.profile) {
       tagEl.innerText = `${this.profile.className} ${this.profile.seatNumber}號`;
     }
-    if (titleEl && this.profile) {
+    if (nameEl && this.profile) {
+      nameEl.innerText = this.profile.nickname || '';
+    }
+    if (titleEl && this.profile && !window.shopManager) {
       titleEl.innerText = this.profile.nickname || '鍵盤學徒';
     }
     if (badgeEl && this.profile) {
-      const showNick = this.profile.nickname ? ` ${this.profile.nickname}` : '';
-      badgeEl.title = `目前學生：${this.profile.className} ${this.profile.seatNumber}號${showNick} (點擊可切換)`;
+      const showNick = this.profile.nickname ? ` · ${this.profile.nickname}` : '';
+      badgeEl.title = `目前學生：${this.profile.className} ${this.profile.seatNumber}號${showNick} (點擊可修改暱稱與密碼)`;
     }
   }
 
@@ -191,23 +196,74 @@ class CloudSyncManager {
   populateClassSelects(preferredClass) {
     const selects = [
       document.getElementById('login-class-select'),
-      document.getElementById('input-class-name')
+      document.getElementById('input-class-name'),
+      document.getElementById('admin-student-class-filter'),
+      document.getElementById('admin-student-class-select')
     ].filter(Boolean);
 
     const targetClass = preferredClass || this.profile.className || (this.classList[0] || '5年3班');
 
     selects.forEach(sel => {
-      const currentVal = sel.value || targetClass;
+      const isLoginClass = sel.id === 'login-class-select';
+      const currentVal = isLoginClass ? (sel.value || '') : (sel.value || targetClass);
       sel.innerHTML = '';
+
+      if (isLoginClass) {
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.innerText = '=選擇班級=';
+        defaultOpt.disabled = true;
+        if (!currentVal) defaultOpt.selected = true;
+        sel.appendChild(defaultOpt);
+      }
+
       this.classList.forEach(cls => {
         const opt = document.createElement('option');
         opt.value = cls;
         opt.innerText = cls;
-        if (cls === currentVal) opt.selected = true;
+        if (!isLoginClass && cls === targetClass) opt.selected = true;
+        else if (isLoginClass && cls === currentVal && currentVal !== '') opt.selected = true;
         sel.appendChild(opt);
       });
-      if (!this.classList.includes(currentVal) && this.classList.length > 0) {
-        sel.value = this.classList[0];
+
+      if (isLoginClass) {
+        if (!currentVal || !this.classList.includes(currentVal)) {
+          sel.value = '';
+        }
+      } else {
+        if (!this.classList.includes(currentVal) && this.classList.length > 0) {
+          sel.value = this.classList[0];
+        }
+      }
+    });
+
+    // 填入「課堂自訂特訓」前臺與後臺目標班級下拉選單 (含全校共用選項)
+    const customSelects = [
+      document.getElementById('custom-lesson-class-select'),
+      document.getElementById('admin-custom-target-class')
+    ].filter(Boolean);
+
+    customSelects.forEach(sel => {
+      const currentVal = sel.value || (sel.id === 'custom-lesson-class-select' ? targetClass : 'all');
+      sel.innerHTML = '';
+
+      // 全校共用選項
+      const allOpt = document.createElement('option');
+      allOpt.value = 'all';
+      allOpt.innerText = sel.id === 'admin-custom-target-class' ? '🌐 全校所有班級 (共用特訓)' : '🌐 全校共用特訓';
+      sel.appendChild(allOpt);
+
+      this.classList.forEach(cls => {
+        const opt = document.createElement('option');
+        opt.value = cls;
+        opt.innerText = cls;
+        sel.appendChild(opt);
+      });
+
+      if (currentVal && (currentVal === 'all' || this.classList.includes(currentVal))) {
+        sel.value = currentVal;
+      } else {
+        sel.value = sel.id === 'custom-lesson-class-select' ? targetClass : 'all';
       }
     });
   }
@@ -240,10 +296,13 @@ class CloudSyncManager {
           firebase.initializeApp(config);
         }
         this.db = firebase.firestore();
+        if (firebase.auth) {
+          this.auth = firebase.auth();
+        }
         this.isFirebaseReady = true;
 
         console.log(`✅ Firebase 雲端資料庫初始化成功！專案 ID: [${config.projectId}]`);
-        this.updateStatusBadge('connected', '☁️ 雲端已連線');
+        this.updateStatusBadge('connected', '雲端已連線');
 
         // 初始化成功後自動自雲端拉取最新班級名冊與管理密碼
         setTimeout(() => {
@@ -253,12 +312,12 @@ class CloudSyncManager {
       } catch (err) {
         console.warn('⚠️ Firebase 初始化發生異常，切換至本機快取安全模式:', err);
         this.isFirebaseReady = false;
-        this.updateStatusBadge('error', '⚠️ 雲端初始化異常');
+        this.updateStatusBadge('error', '雲端初始化異常');
       }
     } else {
       console.log('ℹ️ 未偵測到 Firebase SDK 或憑證，目前運行於本機快取模式。');
       this.isFirebaseReady = false;
-      this.updateStatusBadge('offline', '💾 本機離線模式');
+      this.updateStatusBadge('offline', '本機離線模式');
     }
   }
 
@@ -272,11 +331,13 @@ class CloudSyncManager {
 
     if (pill && pillText) {
       pill.className = `stat-pill pill-cloud ${status}`;
-      pillText.innerText = text;
+      // 清除傳入文字中重複的 emoji 圖示 (保持 icon 與文字單純，避免出現 ☁️☁️)
+      const cleanText = String(text || '').replace(/[☁️⚠️💾]/g, '').trim();
+      pillText.innerText = cleanText;
       if (pillIcon) {
         pillIcon.innerText = status === 'connected' ? '☁️' : status === 'error' ? '⚠️' : '💾';
       }
-      pill.title = `Firebase 資料庫狀態：${text} (專案：${this.config ? this.config.projectId : '未設定'})`;
+      pill.title = `Firebase 資料庫狀態：${cleanText} (專案：${this.config ? this.config.projectId : '未設定'})`;
     }
 
     const adminStatusBox = document.getElementById('admin-firebase-status-box');
@@ -329,7 +390,7 @@ class CloudSyncManager {
       const doc = await this.db.collection('config').doc('school_config').get();
       const ping = Date.now() - startTime;
       
-      this.updateStatusBadge('connected', '☁️ 雲端已連線');
+      this.updateStatusBadge('connected', '雲端已連線');
       return {
         success: true,
         ping: ping,
@@ -667,6 +728,191 @@ class CloudSyncManager {
       toast.style.opacity = '0';
       toast.style.transform = 'translateY(12px)';
     }, 4000);
+  }
+
+  // ==========================================
+  // 教師與管理員身分認證 (Google Auth / Master Admin)
+  // ==========================================
+  async signInWithGoogle() {
+    if (!this.auth) {
+      if (window.firebase && window.firebase.auth) {
+        this.auth = window.firebase.auth();
+      } else {
+        throw new Error('Firebase Auth 模組尚未載入，請確認已載入 firebase-auth-compat.js');
+      }
+    }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const result = await this.auth.signInWithPopup(provider);
+    const user = result.user;
+
+    // 將登入的教師資料登記/更新於 Firestore collection 'teachers'
+    if (user && this.isFirebaseReady && this.db) {
+      try {
+        await this.db.collection('teachers').doc(user.uid).set({
+          uid: user.uid,
+          name: user.displayName || '本校老師',
+          email: user.email || '',
+          photoURL: user.photoURL || '',
+          role: 'teacher',
+          schoolName: '溪洲國小',
+          lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log(`✅ 教師 [${user.displayName} / ${user.email}] 身分驗證已登記！`);
+      } catch (err) {
+        console.warn('寫入教師名冊警告:', err);
+      }
+    }
+    return user;
+  }
+
+  async signOut() {
+    if (this.auth) {
+      await this.auth.signOut();
+    }
+  }
+
+  onAuthStateChanged(callback) {
+    if (this.auth) {
+      return this.auth.onAuthStateChanged(callback);
+    }
+    if (window.firebase && window.firebase.auth) {
+      this.auth = window.firebase.auth();
+      return this.auth.onAuthStateChanged(callback);
+    }
+    return () => {};
+  }
+
+  // ==========================================
+  // 課堂自訂特訓：分班發布與雲端同步 (Proposal VI.1 & Req 5, 7)
+  // ==========================================
+  async saveCustomLessonToCloud(targetClass, title, text, summary = '', author = '教師') {
+    const cleanClass = targetClass || 'all';
+    const docId = `lesson_${cleanClass}`;
+    const lessonData = {
+      targetClass: cleanClass,
+      title: title || (cleanClass === 'all' ? '全校今日特訓' : `${cleanClass}今日特訓`),
+      text: text,
+      summary: summary || `${cleanClass === 'all' ? '全校' : cleanClass}專屬生字詞練習`,
+      author: author,
+      updatedAt: Date.now()
+    };
+
+    // 1. 本地 LocalStorage 快取
+    let allLessons = {};
+    try {
+      allLessons = JSON.parse(localStorage.getItem('typehero_custom_lessons') || '{}');
+    } catch (e) {}
+    allLessons[cleanClass] = lessonData;
+    localStorage.setItem('typehero_custom_lessons', JSON.stringify(allLessons));
+    // 同時相容單一 lesson 鍵名供舊元件讀取
+    localStorage.setItem('typehero_custom_lesson', JSON.stringify(lessonData));
+
+    // 2. 雲端同步
+    if (this.isFirebaseReady && this.db) {
+      try {
+        await this.db.collection('custom_lessons').doc(docId).set({
+          ...lessonData,
+          serverTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log(`☁️ 課堂自訂特訓 [${cleanClass}] 已成功儲存至雲端！`);
+      } catch (err) {
+        console.error('儲存雲端特訓失敗:', err);
+      }
+    }
+    return lessonData;
+  }
+
+  async fetchCustomLessonFromCloud(targetClass) {
+    const cleanClass = targetClass || 'all';
+
+    // 先查本地快取
+    let allLessons = {};
+    try {
+      allLessons = JSON.parse(localStorage.getItem('typehero_custom_lessons') || '{}');
+      if (allLessons[cleanClass]) return allLessons[cleanClass];
+    } catch (e) {}
+
+    // 查詢雲端 Firestore
+    if (this.isFirebaseReady && this.db) {
+      try {
+        const docSnap = await this.db.collection('custom_lessons').doc(`lesson_${cleanClass}`).get();
+        if (docSnap.exists) {
+          const data = docSnap.data();
+          allLessons[cleanClass] = data;
+          localStorage.setItem('typehero_custom_lessons', JSON.stringify(allLessons));
+          return data;
+        } else if (cleanClass !== 'all') {
+          // 若本班尚未發布，自動回退查詢全校共用特訓
+          const allDoc = await this.db.collection('custom_lessons').doc('lesson_all').get();
+          if (allDoc.exists) {
+            return allDoc.data();
+          }
+        }
+      } catch (err) {
+        console.warn('拉取雲端特訓失敗:', err);
+      }
+    }
+
+    return allLessons[cleanClass] || allLessons['all'] || null;
+  }
+
+  async fetchAllCustomLessonsFromCloud() {
+    const list = [];
+    if (this.isFirebaseReady && this.db) {
+      try {
+        const snapshot = await this.db.collection('custom_lessons').get();
+        snapshot.forEach(doc => list.push(doc.data()));
+        if (list.length > 0) return list;
+      } catch (err) {
+        console.warn('拉取全部特訓清單失敗:', err);
+      }
+    }
+
+    // 本地備援
+    try {
+      const allLessons = JSON.parse(localStorage.getItem('typehero_custom_lessons') || '{}');
+      return Object.values(allLessons);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async deleteCustomLessonFromCloud(targetClass) {
+    const cleanClass = targetClass || 'all';
+    let allLessons = {};
+    try {
+      allLessons = JSON.parse(localStorage.getItem('typehero_custom_lessons') || '{}');
+      delete allLessons[cleanClass];
+      localStorage.setItem('typehero_custom_lessons', JSON.stringify(allLessons));
+    } catch (e) {}
+
+    if (this.isFirebaseReady && this.db) {
+      try {
+        await this.db.collection('custom_lessons').doc(`lesson_${cleanClass}`).delete();
+        console.log(`☁️ 課堂特訓 [${cleanClass}] 已自雲端刪除`);
+      } catch (err) {
+        console.error('刪除雲端特訓失敗:', err);
+      }
+    }
+  }
+
+  // ==========================================
+  // 最高管理員：清除全校排行榜 (限 Master Admin)
+  // ==========================================
+  async clearLeaderboardRecords() {
+    localStorage.removeItem('typehero_local_leaderboard');
+    if (this.isFirebaseReady && this.db) {
+      try {
+        const snap = await this.db.collection('leaderboard').limit(100).get();
+        const batch = this.db.batch();
+        snap.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        console.log('🧹 雲端排行榜紀錄已清除！');
+      } catch (err) {
+        console.error('清除雲端排行榜失敗:', err);
+      }
+    }
   }
 }
 

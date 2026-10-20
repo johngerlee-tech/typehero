@@ -554,6 +554,7 @@
               <span>🏫 選擇所屬班級</span>
             </label>
             <select id="login-class-select" class="form-select" required>
+              <option value="" disabled selected>=選擇班級=</option>
               <!-- 由 JavaScript 動態填入班級選項 -->
             </select>
           </div>
@@ -810,7 +811,7 @@
         © 2026 TypeHero 鍵盤英雄 · 專為溪洲國小學童設計之打字冒險學院 · 支援 100% 離線執行與班級雲端排行榜
       </div>
       <div class="footer-links">
-        <a href="javascript:void(0)" onclick="document.getElementById('modal-student-login').classList.add('active')">
+        <a href="javascript:void(0)" onclick="openStudentLoginModal()">
           🎒 切換學生身分
         </a>
         <span>·</span>

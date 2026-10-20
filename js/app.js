@@ -134,9 +134,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const speakBtn = document.getElementById('btn-speak-text');
   if (speakBtn) speakBtn.onclick = speakPromptText;
 
-  // 頂部導航成就榮譽牆按鈕綁定 (Proposal IV.3)
+  // 頂部導航成就榮譽牆按鈕綁定 (Proposal IV.3 & Req 6)
   const achModal = document.getElementById('modal-achievements');
-  const achBtn = document.getElementById('btn-open-achievements');
+  const achBtn = document.getElementById('nav-btn-achievements') || document.getElementById('btn-open-achievements');
   const closeAchBtn = document.getElementById('close-achievements-btn');
   if (achBtn && achModal) {
     achBtn.onclick = () => {
@@ -205,17 +205,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (loginModal) {
     loginModal.classList.add('active');
     const p = window.cloudSync ? window.cloudSync.profile : null;
-    if (p) {
-      const seatInp = document.getElementById('login-seat-input');
-      const nameInp = document.getElementById('login-name-input');
-      const classSel = document.getElementById('login-class-select');
-      const passInp = document.getElementById('login-password-input');
-      if (seatInp) seatInp.value = p.seatNumber || '';
-      // 需求 1: 預設為空白，無暱稱時留空顯示「請設定您的暱稱」placeholder
-      if (nameInp) nameInp.value = p.nickname || '';
-      if (classSel) classSel.value = p.className || (window.cloudSync.classList[0] || '5年3班');
-      if (passInp) passInp.value = p.password || '';
-    }
+    const seatInp = document.getElementById('login-seat-input');
+    const nameInp = document.getElementById('login-name-input');
+    const classSel = document.getElementById('login-class-select');
+    const passInp = document.getElementById('login-password-input');
+    if (seatInp) seatInp.value = (p && p.seatNumber) ? p.seatNumber : '';
+    // 需求 1: 預設為空白，無暱稱時留空顯示「請設定您的暱稱」placeholder
+    if (nameInp) nameInp.value = '';
+    // 需求: 網頁載入🏫 選擇所屬班級 可停留在"=選擇班級="
+    if (classSel) classSel.value = '';
+    if (passInp) passInp.value = '';
   }
 
   // 點擊舞台聚焦真實輸入框
@@ -383,30 +382,30 @@ function getCharSubKeys(char) {
 
   // 1. 標點符號 (支援英數狀態直接敲擊實體鍵)
   const puncMap = {
-    '，': { key: ',', label: '， (,)', hint: '逗號' },
-    '。': { key: '.', label: '。 (.)', hint: '句號' },
-    '！': { key: '!', altKey: '1', label: '！ (Shift+1 或 1)', hint: '驚嘆號' },
-    '？': { key: '?', altKey: '/', label: '？ (Shift+/ 或 /)', hint: '問號' },
-    '：': { key: ':', altKey: ';', label: '： (Shift+;)', hint: '冒號' },
-    '；': { key: ';', label: '； (;)', hint: '分號' },
-    '、': { key: "'", label: "、 (')", hint: '頓號' },
-    '「': { key: '[', label: '「 ([)', hint: '左引號' },
-    '」': { key: ']', label: '」 (])', hint: '右引號' },
-    ',': { key: ',', label: ',' },
-    '.': { key: '.', label: '.' },
-    '!': { key: '!', altKey: '1', label: '!' },
-    '?': { key: '?', altKey: '/', label: '?' },
-    ':': { key: ':', altKey: ';', label: ':' },
-    ';': { key: ';', label: ';' },
-    "'": { key: "'", label: "'" },
-    '[': { key: '[', label: '[' },
-    ']': { key: ']', label: ']' }
+    '，': { key: ',', label: '， (,)', pureZhuyin: '，', hint: '逗號' },
+    '。': { key: '.', label: '。 (.)', pureZhuyin: '。', hint: '句號' },
+    '！': { key: '!', altKey: '1', label: '！ (Shift+1 或 1)', pureZhuyin: '！', hint: '驚嘆號' },
+    '？': { key: '?', altKey: '/', label: '？ (Shift+/ 或 /)', pureZhuyin: '？', hint: '問號' },
+    '：': { key: ':', altKey: ';', label: '： (Shift+;)', pureZhuyin: '：', hint: '冒號' },
+    '；': { key: ';', label: '； (;)', pureZhuyin: '；', hint: '分號' },
+    '、': { key: "'", label: "、 (')", pureZhuyin: '、', hint: '頓號' },
+    '「': { key: '[', label: '「 ([)', pureZhuyin: '「', hint: '左引號' },
+    '」': { key: ']', label: '」 (])', pureZhuyin: '」', hint: '右引號' },
+    ',': { key: ',', label: ',', pureZhuyin: ',' },
+    '.': { key: '.', label: '.', pureZhuyin: '.' },
+    '!': { key: '!', altKey: '1', label: '!', pureZhuyin: '!' },
+    '?': { key: '?', altKey: '/', label: '?', pureZhuyin: '?' },
+    ':': { key: ':', altKey: ';', label: ':', pureZhuyin: ':' },
+    ';': { key: ';', label: ';', pureZhuyin: ';' },
+    "'": { key: "'", label: "'", pureZhuyin: "'" },
+    '[': { key: '[', label: '[', pureZhuyin: '[' },
+    ']': { key: ']', label: ']', pureZhuyin: ']' }
   };
   if (puncMap[char]) return [puncMap[char]];
 
   // 2. 空白鍵
   if (char === ' ') {
-    return [{ key: ' ', label: '空白鍵 (Space)', isSpace: true }];
+    return [{ key: ' ', label: '空白鍵 (Space)', pureZhuyin: '空白鍵', isSpace: true }];
   }
 
   // 3. 注音符號盲打 (ZHUYIN_COURSE 中的單一注音或聲調)
@@ -414,15 +413,16 @@ function getCharSubKeys(char) {
     const pk = window.ZHUYIN_KEY_MAP[char];
     const isTone = (char === 'ˊ' || char === 'ˇ' || char === 'ˋ' || char === '˙');
     const toneName = char === 'ˊ' ? '二聲' : char === 'ˇ' ? '三聲' : char === 'ˋ' ? '四聲' : char === '˙' ? '輕聲' : '';
-    return [{ key: pk, label: `${char} (${pk.toUpperCase()}) ${toneName}`.trim(), zh: char, isTone }];
+    return [{ key: pk, label: `${char} (${pk.toUpperCase()}) ${toneName}`.trim(), pureZhuyin: char, zh: char, isTone }];
   }
 
   // 4. 英文字母或數字
   if (/^[a-zA-Z0-9]$/.test(char)) {
-    return [{ key: char.toLowerCase(), label: char.toUpperCase() }];
+    return [{ key: char.toLowerCase(), label: char.toUpperCase(), pureZhuyin: char.toUpperCase() }];
   }
 
   // 5. 中文字詞：免選字音節拆解 (依據 ZHUYIN_CHAR_MAP 拆為大千注音鍵位)
+  // 需求 1: 拿掉鍵盤符號，保持單純注音符號 (例如 老：ㄌ ㄠ ˇ)
   if (window.ZHUYIN_CHAR_MAP && window.ZHUYIN_CHAR_MAP[char]) {
     const zhStr = window.ZHUYIN_CHAR_MAP[char];
     const steps = [];
@@ -437,24 +437,24 @@ function getCharSubKeys(char) {
         hasTone = true;
         const k = window.ZHUYIN_KEY_MAP ? window.ZHUYIN_KEY_MAP[z] : null;
         const toneName = z === 'ˊ' ? '二聲' : z === 'ˇ' ? '三聲' : '四聲';
-        if (k) steps.push({ key: k, label: `${z} (${k}) ${toneName}`, zh: z, isTone: true });
+        if (k) steps.push({ key: k, label: `${z} (${k}) ${toneName}`, pureZhuyin: z, zh: z, isTone: true });
       } else {
         const k = window.ZHUYIN_KEY_MAP ? window.ZHUYIN_KEY_MAP[z] : null;
-        if (k) steps.push({ key: k, label: `${z} (${k.toUpperCase()})`, zh: z });
+        if (k) steps.push({ key: k, label: `${z} (${k.toUpperCase()})`, pureZhuyin: z, zh: z });
       }
     }
 
     if (lightTone) {
-      steps.push({ key: '7', label: '˙ (7) 輕聲', zh: '˙', isTone: true });
+      steps.push({ key: '7', label: '˙ (7) 輕聲', pureZhuyin: '˙', zh: '˙', isTone: true });
     } else if (!hasTone) {
-      // 一聲以空白鍵完成
-      steps.push({ key: ' ', label: '一聲 (Space)', zh: ' ', isTone: true, isSpace: true });
+      // 一聲以空白鍵完成，純注音顯示為「一聲」
+      steps.push({ key: ' ', label: '一聲 (Space)', pureZhuyin: '一聲', zh: '一聲', isTone: true, isSpace: true });
     }
 
     return steps;
   }
 
-  return [{ key: char, label: char }];
+  return [{ key: char, label: char, pureZhuyin: char }];
 }
 
 function isSubKeyMatch(typed, step) {
@@ -1519,18 +1519,21 @@ function highlightTarget(char) {
   const targetKeyChar = currentStep.key;
 
   // 1. 更新注音拆解 Badge (免選字即時進度導引)
+  // 需求 1: 拿掉鍵盤符號，保持單純注音符號 (如 老：ㄌ ㄠ ˇ)
   if (zhuyinBadge && zhuyinText) {
     if (subKeys.length > 1) {
       let partsHtml = `<strong style="color:var(--text-main); margin-right:4px;">${currentChar}：</strong>`;
       subKeys.forEach((step, sIdx) => {
         const stateClass = sIdx < gameState.subCharIndex ? 'zh-done' : (sIdx === gameState.subCharIndex ? 'zh-active' : 'zh-pending');
         const checkIcon = sIdx < gameState.subCharIndex ? '✓ ' : '';
-        partsHtml += `<span class="zh-part ${stateClass}">${checkIcon}${step.label}</span>`;
+        const displaySymbol = step.pureZhuyin || step.zh || step.label.replace(/\s*\([^)]*\)/g, '');
+        partsHtml += `<span class="zh-part ${stateClass}">${checkIcon}${displaySymbol}</span>`;
       });
       zhuyinText.innerHTML = partsHtml;
       zhuyinBadge.classList.remove('hidden');
-    } else if (currentStep.hint) {
-      zhuyinText.innerHTML = `<strong style="color:var(--text-main); margin-right:4px;">${currentChar}</strong> → <span class="zh-part zh-active">${currentStep.label}</span>`;
+    } else if (currentStep.hint || currentStep.zh) {
+      const displaySymbol = currentStep.pureZhuyin || currentStep.zh || currentChar;
+      zhuyinText.innerHTML = `<strong style="color:var(--text-main); margin-right:4px;">${currentChar}</strong> → <span class="zh-part zh-active">${displaySymbol}</span>`;
       zhuyinBadge.classList.remove('hidden');
     } else {
       zhuyinBadge.classList.add('hidden');
@@ -1572,7 +1575,9 @@ function highlightTarget(char) {
 
     const stepProgress = subKeys.length > 1 ? `（${currentChar} 注音拆解 ${gameState.subCharIndex + 1}/${subKeys.length}）` : '';
     if (hudHint) {
-      hudHint.innerHTML = `請使用 <strong style="color:#ef4444; font-size:0.95rem;">${info.hand}${info.finger}</strong> 輕敲 [ <strong style="color:var(--text-main); font-size:1.05rem;">${currentStep.label}</strong> ] <span style="font-size:0.75rem; color:var(--accent-gold); font-weight:bold;">${stepProgress}</span>`;
+      const keyName = targetKeyChar === ' ' ? '空白鍵' : targetKeyChar.toUpperCase();
+      const symbolDesc = currentStep.pureZhuyin ? ` (${currentStep.pureZhuyin})` : '';
+      hudHint.innerHTML = `請使用 <strong style="color:#ef4444; font-size:0.95rem;">${info.hand}${info.finger}</strong> 輕敲 [ <strong style="color:var(--text-main); font-size:1.05rem;">${keyName}${symbolDesc}</strong> ] <span style="font-size:0.75rem; color:var(--accent-gold); font-weight:bold;">${stepProgress}</span>`;
     }
   }
 
@@ -1887,18 +1892,17 @@ function initModals() {
   if (lbAcc) lbAcc.onclick = () => renderLeaderboard('accuracy');
   if (lbDil) lbDil.onclick = () => renderLeaderboard('diligence');
 
-  // 1. 個人班級雲端設定彈窗
+  // 1. 個人班級雲端設定彈窗 (需求 3: 點擊不應切換班級座號，而是修改暱稱與通行密碼)
   const profileModal = document.getElementById('modal-profile');
   document.getElementById('user-profile-badge').onclick = () => {
     const p = window.cloudSync ? window.cloudSync.profile : { className: '5年3班', seatNumber: '01', nickname: '鍵盤小英雄' };
-    if (window.cloudSync) window.cloudSync.populateClassSelects(p.className);
-    const classSel = document.getElementById('input-class-name');
-    const seatInp = document.getElementById('input-seat-num');
+    const classSeatTag = document.getElementById('profile-modal-class-seat');
     const nickInp = document.getElementById('input-nickname');
+    const passInp = document.getElementById('input-profile-password');
 
-    if (classSel) classSel.value = p.className;
-    if (seatInp) seatInp.value = p.seatNumber;
-    if (nickInp) nickInp.value = p.nickname;
+    if (classSeatTag) classSeatTag.innerText = `${p.className} ${p.seatNumber}號`;
+    if (nickInp) nickInp.value = p.nickname || '';
+    if (passInp) passInp.value = ''; // 保持空白，使用者輸入時才變更
 
     // 同步顯示目前裝備的冒險角色大貼紙
     const modalAvatar = document.getElementById('profile-modal-avatar');
@@ -1909,21 +1913,35 @@ function initModals() {
 
     profileModal.classList.add('active');
   };
+
   document.getElementById('close-profile-btn').onclick = () => profileModal.classList.remove('active');
+
   document.getElementById('save-profile-btn').onclick = async () => {
-    const c = document.getElementById('input-class-name').value.trim() || '5年3班';
-    const s = document.getElementById('input-seat-num').value.trim() || '01';
-    const n = document.getElementById('input-nickname').value.trim() || '鍵盤小英雄';
-    if (window.cloudSync) {
-      window.cloudSync.saveProfile(c, s, n);
-      const cloudData = await window.cloudSync.loadProfileFromCloud(c, s);
-      if (cloudData && gameState.currentCategory && window.COURSES) {
-        renderLessonsGrid(window.COURSES[gameState.currentCategory]);
-      }
+    const p = window.cloudSync ? window.cloudSync.profile : null;
+    if (!p) return;
+    const nickInp = document.getElementById('input-nickname');
+    const passInp = document.getElementById('input-profile-password');
+    const newNick = (nickInp ? nickInp.value.trim() : '') || p.nickname || '鍵盤小英雄';
+    const newPass = passInp ? passInp.value.trim() : '';
+
+    p.nickname = newNick;
+    if (newPass) {
+      p.password = newPass;
+    }
+    window.cloudSync.profile = p;
+    localStorage.setItem(window.cloudSync.storageKey, JSON.stringify(p));
+    window.cloudSync.updateProfileBadgeUI();
+
+    if (window.cloudSync.isFirebaseReady) {
+      await window.cloudSync.syncProfileToCloud();
     }
     if (window.shopManager) window.shopManager.updateUI();
     profileModal.classList.remove('active');
-    alert('✅ 個人檔案與班級設定已更新！');
+    if (window.cloudSync.showToast) {
+      window.cloudSync.showToast('✅ 暱稱與通行密碼已更新！', 'success');
+    } else {
+      alert('✅ 暱稱與通行密碼已更新！');
+    }
   };
 
   // 2. 學生登載資料歡迎彈窗 (首頁載入)
@@ -1935,15 +1953,27 @@ function initModals() {
   const loginPassInp = document.getElementById('login-password-input');
   const loginPassError = document.getElementById('login-password-error');
 
+  window.openStudentLoginModal = function() {
+    if (loginClassSel) loginClassSel.value = '';
+    if (loginPassError) loginPassError.style.display = 'none';
+    if (loginModal) loginModal.classList.add('active');
+  };
+
   if (loginForm) {
     loginForm.onsubmit = async (e) => {
       e.preventDefault();
-      const selClass = loginClassSel ? loginClassSel.value : '5年3班';
+      const selClass = loginClassSel ? loginClassSel.value : '';
       const seatVal = loginSeatInp ? loginSeatInp.value.trim() : '';
       const nameVal = loginNameInp ? loginNameInp.value.trim() : '';
       const passVal = loginPassInp ? loginPassInp.value.trim() : '';
 
       if (loginPassError) loginPassError.style.display = 'none';
+
+      if (!selClass || selClass === '=選擇班級=') {
+        alert('⚠️ 請先選擇您的所屬班級喔！');
+        if (loginClassSel) loginClassSel.focus();
+        return;
+      }
 
       if (!seatVal) {
         alert('⚠️ 請輸入學生座號喔！');
@@ -2031,7 +2061,7 @@ function initModals() {
 
   openAdminBtns.forEach(btn => {
     btn.onclick = () => {
-      window.openAdminAuthModal();
+      window.open('admin.html', '_blank');
     };
   });
 
@@ -2279,30 +2309,68 @@ function initModals() {
 }
 
 /**
- * 初始化課堂自訂題目系統 (Proposal IV.1)
+ * 載入指定班級之課堂自訂特訓題目 (Proposal VI.1 & Req 5)
+ */
+async function loadCustomLessonForClass(targetClass) {
+  const customContainer = document.getElementById('custom-tab-container') || document.getElementById('tab-custom-lesson');
+  const classDropdown = document.getElementById('custom-lesson-class-select');
+  const studentClass = (window.cloudSync && window.cloudSync.profile) ? window.cloudSync.profile.className : 'all';
+  const queryClass = targetClass || (classDropdown ? classDropdown.value : studentClass) || 'all';
+
+  let lessonData = null;
+  if (window.cloudSync && window.cloudSync.fetchCustomLessonFromCloud) {
+    lessonData = await window.cloudSync.fetchCustomLessonFromCloud(queryClass);
+  }
+
+  // 備援讀取本地
+  if (!lessonData) {
+    try {
+      const allLessons = JSON.parse(localStorage.getItem('typehero_custom_lessons') || '{}');
+      lessonData = allLessons[queryClass] || allLessons['all'] || JSON.parse(localStorage.getItem('typehero_custom_lesson') || 'null');
+    } catch (e) {}
+  }
+
+  if (lessonData && lessonData.text) {
+    window.COURSES.custom = [{
+      id: 'custom-1',
+      title: lessonData.title || (queryClass === 'all' ? '全校今日特訓' : `${queryClass}今日特訓`),
+      summary: lessonData.summary || `${queryClass === 'all' ? '全校' : queryClass}專屬題目`,
+      keys: [],
+      text: lessonData.text
+    }];
+
+    if (customContainer) customContainer.style.display = 'inline-flex';
+    if (classDropdown && queryClass) classDropdown.value = queryClass;
+
+    // 若當前正處於自訂分類中，即時重新繪製關卡與載入第一關
+    if (gameState.currentCategory === 'custom') {
+      renderLessonsGrid(window.COURSES.custom);
+      loadLesson(window.COURSES.custom[0]);
+    }
+    return true;
+  } else {
+    // 若該班無特訓且全校亦無特訓
+    if (window.COURSES && !window.COURSES.custom) {
+      if (customContainer) customContainer.style.display = 'none';
+    }
+    return false;
+  }
+}
+
+/**
+ * 初始化課堂自訂題目系統與班級下拉選單綁定 (Proposal VI.1 & Req 5)
  */
 function initCustomLessonSystem() {
-  const saved = localStorage.getItem('typehero_custom_lesson');
-  const tabCustom = document.getElementById('tab-custom-lesson');
-  if (saved) {
-    try {
-      const data = JSON.parse(saved);
-      if (data && data.text) {
-        window.COURSES.custom = [{
-          id: 'custom-1',
-          title: data.title || '課堂自訂特訓題目',
-          summary: data.summary || '今日課堂專屬題目',
-          keys: [],
-          text: data.text
-        }];
-        if (tabCustom) tabCustom.style.display = 'inline-flex';
-        return;
-      }
-    } catch (e) {
-      console.warn(e);
-    }
+  const classDropdown = document.getElementById('custom-lesson-class-select');
+  if (classDropdown) {
+    classDropdown.onchange = () => {
+      loadCustomLessonForClass(classDropdown.value);
+    };
   }
-  if (tabCustom) tabCustom.style.display = 'none';
+
+  // 嘗試載入學生所屬班級或全校特訓
+  const studentClass = (window.cloudSync && window.cloudSync.profile) ? window.cloudSync.profile.className : 'all';
+  loadCustomLessonForClass(studentClass);
 }
 
 /**
