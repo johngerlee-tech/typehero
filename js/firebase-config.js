@@ -22,6 +22,7 @@ const DEFAULT_FIREBASE_CONFIG = {
   appId: "1:557883116904:web:ed55d47dfb9780e47bdadd", 
   measurementId: "G-D6C1TXC226" 
 };
+window.DEFAULT_FIREBASE_CONFIG = DEFAULT_FIREBASE_CONFIG;
 
 // 預設全校班級清單（溪洲國小）
 const DEFAULT_CLASS_LIST = [

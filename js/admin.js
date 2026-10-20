@@ -36,11 +36,55 @@ document.addEventListener('DOMContentLoaded', () => {
         btnGoogleLogin.disabled = true;
         btnGoogleLogin.innerHTML = '<span>🔄 正在呼叫 Google 授權視窗...</span>';
 
-        if (!window.cloudSync) {
-          throw new Error('CloudSyncManager 模組尚未準備就緒');
+        let user = null;
+        if (window.cloudSync && typeof window.cloudSync.signInWithGoogle === 'function') {
+          user = await window.cloudSync.signInWithGoogle();
+        } else {
+          // 備援直接呼叫 Firebase Auth (防止因瀏覽器快取導致舊版 signInWithGoogle 函式未載入)
+          if (!window.firebase || !window.firebase.auth) {
+            throw new Error('Firebase Auth 模組尚未載入完成，請重新整理網頁！');
+          }
+          if (!firebase.apps.length) {
+            const cfg = (window.cloudSync && window.cloudSync.config) || window.DEFAULT_FIREBASE_CONFIG || {
+              apiKey: "AIzaSyDWbWFjGra5ul1mShoMbHm26SOIqyz_cSI",
+              authDomain: "typehero-1c28f.firebaseapp.com",
+              projectId: "typehero-1c28f",
+              storageBucket: "typehero-1c28f.firebasestorage.app",
+              messagingSenderId: "557883116904",
+              appId: "1:557883116904:web:ed55d47dfb9780e47bdadd",
+              measurementId: "G-D6C1TXC226"
+            };
+            firebase.initializeApp(cfg);
+          }
+          const auth = firebase.auth();
+          const provider = new firebase.auth.GoogleAuthProvider();
+          provider.setCustomParameters({ prompt: 'select_account' });
+          const result = await auth.signInWithPopup(provider);
+          user = result.user;
+
+          // 登記教師身分至 Firestore (若資料庫可用)
+          if (window.firebase.firestore && firebase.apps.length) {
+            try {
+              const db = firebase.firestore();
+              await db.collection('teachers').doc(user.uid).set({
+                uid: user.uid,
+                name: user.displayName || '本校老師',
+                email: user.email || '',
+                photoURL: user.photoURL || '',
+                role: 'teacher',
+                schoolName: '溪洲國小',
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+            } catch (e) {
+              console.warn('登記教師資訊警告:', e);
+            }
+          }
         }
 
-        const user = await window.cloudSync.signInWithGoogle();
+        if (!user) {
+          throw new Error('未取得授權使用者資訊，請重試！');
+        }
+
         handleLoginSuccess({
           name: user.displayName || '本校老師',
           email: user.email || 'Google 認證教師',
@@ -51,31 +95,23 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (err) {
         console.warn('Google 登入失敗或取消:', err);
         let msg = err.message || '登入失敗';
+        const hostname = window.location.hostname || '此網域';
         if (err.code === 'auth/popup-closed-by-user') {
           msg = '您已關閉 Google 授權視窗。';
         } else if (err.code === 'auth/unauthorized-domain') {
-          msg = '【網域未授權】此網頁執行的網域尚未加入 Firebase Console -> Authentication -> Settings ->「授權網域」清單中！\n請使用下方的「教師身分免 Google 登入體驗」先行體驗。';
+          msg = `【Firebase 授權網域未設定】\n您目前的網域「${hostname}」尚未加入 Firebase 授權名單。\n\n💡 設定方法：\n請至 Firebase 控制台 (console.firebase.google.com)\n➔ Authentication (身分驗證)\n➔ Settings (設定) 標籤頁\n➔ Authorized domains (已授權的網域)\n➔ 點擊「新增網域」並輸入：「${hostname}」即可！`;
+        } else if (err.code === 'auth/operation-not-allowed') {
+          msg = '【尚未啟用 Google 登入提供者】\n請至 Firebase 控制台 ➔ Authentication ➔ Sign-in method 啟用「Google」登入提供者！';
+        } else if (err.code === 'auth/popup-blocked') {
+          msg = 'Google 登入視窗被瀏覽器阻擋，請在網址列點擊允許彈出式視窗後重試！';
         } else if (err.code === 'auth/operation-not-supported-in-this-environment') {
-          msg = '本機環境 (file://) 限制跨網域彈窗，請使用下方的「教師身分免 Google 登入體驗」直接進入！';
+          msg = '本機環境 (file://) 限制跨網域彈窗，請透過 HTTP/HTTPS (例如 GitHub Pages 或本機伺服器) 開啟進行 Google 登入！';
         }
         alert(`⚠️ ${msg}`);
       } finally {
         btnGoogleLogin.disabled = false;
         btnGoogleLogin.innerHTML = '<span>🌐 使用 Google 帳號登入 / 註冊</span>';
       }
-    };
-  }
-
-  // A-2. 本機免 Google 登入體驗按鈕 (防止離線或本機檔案無法跳出 Google Auth)
-  const btnMockTeacher = document.getElementById('btn-mock-teacher-login');
-  if (btnMockTeacher) {
-    btnMockTeacher.onclick = () => {
-      handleLoginSuccess({
-        name: '溪洲授課教師 (離線模式)',
-        email: 'teacher@xizhou.edu.tw',
-        photoURL: '',
-        role: 'teacher'
-      });
     };
   }
 

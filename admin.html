@@ -246,10 +246,6 @@
           <button id="btn-google-login" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.75rem; background: linear-gradient(135deg, #10b981, #059669); font-size: 0.95rem;">
             <span>🌐 使用 Google 帳號登入 / 註冊</span>
           </button>
-          <!-- 離線 / 本機測試輔助按鈕 (在不支援 Google 彈窗之本地 file:// 環境下無痛切換) -->
-          <button id="btn-mock-teacher-login" class="btn-secondary" style="width: 100%; justify-content: center; padding: 0.45rem; font-size: 0.75rem; margin-top: 0.5rem; border-color: rgba(16, 185, 129, 0.3);">
-            🏫 教師身分免 Google 登入 (本機離線體驗)
-          </button>
         </div>
 
         <div style="display:flex; align-items:center; gap:0.75rem; color:var(--text-muted); font-size:0.75rem;">
@@ -541,8 +537,8 @@
     </div>
   </footer>
 
-  <!-- 模組腳本載入 -->
-  <script src="js/firebase-config.js?v=2.4"></script>
-  <script src="js/admin.js?v=2.4"></script>
+  <!-- 模組腳本載入 (版本號防快取) -->
+  <script src="js/firebase-config.js?v=2.5.1"></script>
+  <script src="js/admin.js?v=2.5.1"></script>
 </body>
 </html>
