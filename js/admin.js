@@ -314,6 +314,27 @@ document.addEventListener('DOMContentLoaded', () => {
       if (refreshTeachersBtn) refreshTeachersBtn.disabled = false;
       loadTeachersList();
     }
+
+    // 卡片 6: 學年度編班名冊與學生資產升級移轉精靈
+    const noticeMigrationLocked = document.getElementById('notice-migration-locked');
+    const badgeMigrationRole = document.getElementById('badge-migration-role');
+    const btnExecute115 = document.getElementById('btn-execute-115-binding');
+    const btnExecuteMigration = document.getElementById('btn-execute-migration');
+    const btnSyncClasses = document.getElementById('btn-sync-115-classes');
+
+    if (isTeacher) {
+      if (noticeMigrationLocked) noticeMigrationLocked.style.display = 'flex';
+      if (badgeMigrationRole) badgeMigrationRole.innerText = '🔒 僅限最高管理員';
+      if (btnExecute115) btnExecute115.disabled = true;
+      if (btnExecuteMigration) btnExecuteMigration.disabled = true;
+      if (btnSyncClasses) btnSyncClasses.disabled = true;
+    } else {
+      if (noticeMigrationLocked) noticeMigrationLocked.style.display = 'none';
+      if (badgeMigrationRole) badgeMigrationRole.innerText = '👑 具備完全權限';
+      if (btnExecute115) btnExecute115.disabled = false;
+      if (btnExecuteMigration) btnExecuteMigration.disabled = false;
+      if (btnSyncClasses) btnSyncClasses.disabled = false;
+    }
   }
 
   // =========================================================================
@@ -497,11 +518,132 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // =========================================================================
   // 5. 學生帳號與通行密碼管理 (需求 7: 查閱班級密碼與協助修改)
+  // 加上「班級專屬通關密碼防護」控制 (預設關閉，防冒用與亂入)
   // =========================================================================
   const studentClassSelect = document.getElementById('admin-student-class-select');
   const studentsTableBody = document.getElementById('admin-students-table-body');
   const btnToggleShowPwd = document.getElementById('admin-btn-toggle-show-pwd');
   const btnRefreshStudents = document.getElementById('admin-btn-refresh-students');
+
+  // 班級專屬通關密碼控制元素
+  const classPasscodeTargetName = document.getElementById('admin-class-passcode-target-name');
+  const classPasscodeBadge = document.getElementById('admin-class-passcode-badge');
+  const classPasscodeToggle = document.getElementById('admin-class-passcode-toggle');
+  const classPasscodeInputWrap = document.getElementById('admin-class-passcode-input-wrap');
+  const classPasscodeInput = document.getElementById('admin-class-passcode-input');
+  const btnSaveClassPasscode = document.getElementById('admin-btn-save-class-passcode');
+  const classPasscodeStatusMsg = document.getElementById('admin-class-passcode-status-msg');
+
+  function updateClassPasscodeUI(clsName) {
+    const targetClass = clsName || (studentClassSelect ? studentClassSelect.value : '');
+    if (!targetClass) return;
+
+    if (classPasscodeTargetName) {
+      classPasscodeTargetName.innerText = targetClass;
+    }
+
+    // 自由測試組永遠免防護
+    if (targetClass.includes('測試') || targetClass.includes('體驗')) {
+      if (classPasscodeToggle) {
+        classPasscodeToggle.checked = false;
+        classPasscodeToggle.disabled = true;
+      }
+      if (classPasscodeInputWrap) classPasscodeInputWrap.style.display = 'none';
+      if (classPasscodeBadge) {
+        classPasscodeBadge.innerText = '🧪 自由測試組免密碼';
+        classPasscodeBadge.style.color = '#38bdf8';
+        classPasscodeBadge.style.background = 'rgba(56, 189, 248, 0.15)';
+      }
+      if (classPasscodeStatusMsg) {
+        classPasscodeStatusMsg.style.display = 'block';
+        classPasscodeStatusMsg.style.color = '#38bdf8';
+        classPasscodeStatusMsg.innerText = '💡 體驗測試組專供自由練習，無需設定班級通關密碼。';
+      }
+      return;
+    }
+
+    if (classPasscodeToggle) {
+      classPasscodeToggle.disabled = false;
+    }
+    if (classPasscodeStatusMsg) classPasscodeStatusMsg.style.display = 'none';
+
+    const info = window.cloudSync ? window.cloudSync.getClassPasscodeInfo(targetClass) : { enabled: false, passcode: '' };
+
+    if (info.enabled && info.passcode) {
+      if (classPasscodeToggle) classPasscodeToggle.checked = true;
+      if (classPasscodeInputWrap) classPasscodeInputWrap.style.display = 'flex';
+      if (classPasscodeInput) classPasscodeInput.value = info.passcode;
+      if (classPasscodeBadge) {
+        classPasscodeBadge.innerText = `🛡️ 已開啟防護（通關密碼：${info.passcode}）`;
+        classPasscodeBadge.style.color = '#34d399';
+        classPasscodeBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+      }
+    } else {
+      if (classPasscodeToggle) classPasscodeToggle.checked = false;
+      if (classPasscodeInputWrap) classPasscodeInputWrap.style.display = 'none';
+      if (classPasscodeInput) classPasscodeInput.value = info.passcode || '';
+      if (classPasscodeBadge) {
+        classPasscodeBadge.innerText = '預設未開啟 (免通關密碼)';
+        classPasscodeBadge.style.color = 'var(--text-muted)';
+        classPasscodeBadge.style.background = 'rgba(255, 255, 255, 0.08)';
+      }
+    }
+  }
+
+  // 勾選/取消開關
+  if (classPasscodeToggle) {
+    classPasscodeToggle.onchange = async () => {
+      const targetClass = studentClassSelect ? studentClassSelect.value : '';
+      if (!targetClass) return;
+
+      if (classPasscodeToggle.checked) {
+        if (classPasscodeInputWrap) classPasscodeInputWrap.style.display = 'flex';
+        if (classPasscodeInput) {
+          classPasscodeInput.focus();
+        }
+      } else {
+        // 取消勾選直接關閉該班防護
+        if (confirm(`確定要關閉【${targetClass}】的專屬通關密碼防護嗎？\n關閉後學生登入該班級將不需輸入班級密碼。`)) {
+          if (classPasscodeInputWrap) classPasscodeInputWrap.style.display = 'none';
+          if (window.cloudSync) {
+            await window.cloudSync.saveClassPasscode(targetClass, false, '');
+          }
+          updateClassPasscodeUI(targetClass);
+          alert(`✅ 已關閉【${targetClass}】之班級通關密碼防護！`);
+        } else {
+          classPasscodeToggle.checked = true;
+        }
+      }
+    };
+  }
+
+  // 點擊儲存密碼按鈕
+  if (btnSaveClassPasscode) {
+    btnSaveClassPasscode.onclick = async () => {
+      const targetClass = studentClassSelect ? studentClassSelect.value : '';
+      if (!targetClass) return;
+      const code = classPasscodeInput ? classPasscodeInput.value.trim() : '';
+
+      if (!code) {
+        alert('⚠️ 請輸入班級通關密碼！');
+        if (classPasscodeInput) classPasscodeInput.focus();
+        return;
+      }
+
+      btnSaveClassPasscode.disabled = true;
+      btnSaveClassPasscode.innerText = '💾 儲存中...';
+
+      if (window.cloudSync) {
+        await window.cloudSync.saveClassPasscode(targetClass, true, code);
+      }
+
+      btnSaveClassPasscode.disabled = false;
+      btnSaveClassPasscode.innerText = '💾 儲存班級密碼';
+
+      updateClassPasscodeUI(targetClass);
+      alert(`✅ 成功設定【${targetClass}】專屬通關密碼為：[${code}]！\n學生登入該班級前必須輸入此密碼才能進入打字！`);
+    };
+  }
 
   if (btnToggleShowPwd) {
     btnToggleShowPwd.onclick = () => {
@@ -512,15 +654,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (studentClassSelect) {
-    studentClassSelect.onchange = loadStudentsRoster;
+    studentClassSelect.onchange = () => {
+      loadStudentsRoster();
+      updateClassPasscodeUI(studentClassSelect.value);
+    };
   }
   if (btnRefreshStudents) {
-    btnRefreshStudents.onclick = loadStudentsRoster;
+    btnRefreshStudents.onclick = () => {
+      loadStudentsRoster();
+      if (studentClassSelect) updateClassPasscodeUI(studentClassSelect.value);
+    };
   }
 
   async function loadStudentsRoster() {
     if (!studentsTableBody) return;
     const selectedClass = studentClassSelect ? studentClassSelect.value : (window.cloudSync ? window.cloudSync.classList[0] : '5年3班');
+    updateClassPasscodeUI(selectedClass);
 
     studentsTableBody.innerHTML = `
       <tr>
@@ -554,9 +703,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ? (st.password ? `<span class="pwd-code-badge">${st.password}</span>` : '<span style="color:var(--text-muted);">無密碼</span>')
         : (st.password ? '<span class="pwd-code-badge">••••</span>' : '<span style="color:var(--text-muted);">無密碼</span>');
 
+      const studentNoDisplay = st.studentNo ? `<code style="color:#38bdf8; font-size:0.75rem; font-weight:bold;">${st.studentNo}</code>` : '<span style="color:var(--text-muted); font-size:0.75rem;">-</span>';
+      const realNameDisplay = st.realName ? `<span style="font-weight:bold; color:#fff;">${st.realName}</span>` : '<span style="color:var(--text-muted); font-size:0.75rem;">未綁定</span>';
+
       tr.innerHTML = `
         <td style="font-weight:bold;">${st.seatNumber || '0'}</td>
-        <td style="font-weight:bold; color:var(--brand-primary);">${st.nickname || '未設定'}</td>
+        <td>${studentNoDisplay}</td>
+        <td>${realNameDisplay}</td>
+        <td style="font-weight:bold; color:var(--brand-primary);">${st.nickname || '<span style="color:var(--text-muted); font-weight:normal;">未設定</span>'}</td>
         <td>Lv.${st.level || 1}</td>
         <td style="color:#fbbf24; font-weight:bold;">🪙 ${st.coins || 0}</td>
         <td>${pwdDisplay}</td>
@@ -569,7 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 點擊「修改密碼」彈窗迅速為學生重設
       tr.querySelector('.btn-modify-pwd').onclick = async () => {
-        const studentDesc = `${selectedClass} ${st.seatNumber}號 (${st.nickname || '學生'})`;
+        const studentDesc = `${selectedClass} ${st.seatNumber}號 ${st.realName ? st.realName + ' ' : ''}(${st.nickname || '學生'})`;
         const newPass = prompt(`請輸入【${studentDesc}】的新通行密碼：\n(目前密碼：${st.password || '無'})`, st.password || '');
         if (newPass !== null && newPass.trim() !== '') {
           const clean = newPass.trim();
@@ -937,4 +1091,601 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
   }
+
+  // =========================================================================
+  // 7. 學年度編班名冊與學生資產升級移轉精靈 (Card 6)
+  // =========================================================================
+  const DEFAULT_115_ROSTER_CSV = `班級,座號,姓名,學號,學年度
+一年甲班,1,陽侑辰,115001,115
+一年甲班,2,莊富程,115002,115
+一年甲班,3,廖英晟,115003,115
+一年甲班,4,林元海,115004,115
+一年甲班,5,詹博勛,115005,115
+一年甲班,6,蔡杰倫,115006,115
+一年甲班,7,吳竑諭,115007,115
+一年甲班,8,蔡煜晨,115008,115
+一年甲班,9,何詠宸,115009,115
+一年甲班,10,孔芝婷,115010,115
+一年甲班,11,張杏慈,115011,115
+一年甲班,12,黃雅樂,115012,115
+一年甲班,13,陳羽心,115013,115
+一年甲班,14,彭芷淇,115014,115
+一年甲班,15,楊秀英,115015,115
+一年甲班,16,賴姿蓉,115016,115
+一年甲班,17,王辰希,115017,115
+一年甲班,18,李璦希,115018,115
+一年乙班,1,林冠橙,115019,115
+一年乙班,2,林宸詳,115020,115
+一年乙班,3,吳侑祐,115021,115
+一年乙班,4,邱福笙,115022,115
+一年乙班,5,張宸禕,115023,115
+一年乙班,6,張智宸,115024,115
+一年乙班,7,張秉豪,115025,115
+一年乙班,8,張嘉紘,115026,115
+一年乙班,9,裴宏田,115027,115
+一年乙班,10,張詠絜,115028,115
+一年乙班,11,陳姵妘,115029,115
+一年乙班,12,陳湘畇,115030,115
+一年乙班,13,張依慈,115031,115
+一年乙班,14,張語宸,115032,115
+一年乙班,15,吳語涵,115033,115
+一年乙班,16,姜欣羽,115034,115
+一年乙班,17,許喬茵,115035,115
+一年乙班,18,陳詩雨,115036,115
+二年甲班,1,林駿庭,114001,115
+二年甲班,2,張東憲,114002,115
+二年甲班,3,何旼祐,114003,115
+二年甲班,4,吳祐丞,114004,115
+二年甲班,5,姜信竹,114005,115
+二年甲班,6,張有志,114006,115
+二年甲班,7,何秉鴻,114007,115
+二年甲班,8,陳柏汎,114008,115
+二年甲班,9,張芷瑄,114009,115
+二年甲班,10,賴芷柔,114010,115
+二年甲班,11,李怡萱,114011,115
+二年甲班,12,張語芮,114012,115
+二年甲班,13,何予錝,114026,115
+二年甲班,14,黃妤恩,114027,115
+二年乙班,1,陳威宇,114013,115
+二年乙班,2,張凱睿,114014,115
+二年乙班,3,曾鉑華,114015,115
+二年乙班,4,田詠傑,114016,115
+二年乙班,5,李威佑,114017,115
+二年乙班,6,張祐丞,114018,115
+二年乙班,7,沈宥町,114019,115
+二年乙班,8,葉科鋒,114020,115
+二年乙班,9,李子茵,114021,115
+二年乙班,10,林思媛,114022,115
+二年乙班,11,林俐言,114023,115
+二年乙班,12,陳昀汝,114024,115
+二年乙班,13,陳鈺文,114025,115
+三年甲班,1,吳宇炘,113036,115
+三年甲班,2,陳雍潤,113019,115
+三年甲班,3,賴畋佑,113003,115
+三年甲班,4,張宸揚,113020,115
+三年甲班,5,蔡定騫,113022,115
+三年甲班,6,王祐嘉,113023,115
+三年甲班,7,廖晙邑,113025,115
+三年甲班,8,鄭祺穎,113008,115
+三年甲班,9,林威佑,113009,115
+三年甲班,10,鄭叡安,113026,115
+三年甲班,11,陳亭羽,113027,115
+三年甲班,12,潘禹彤,113011,115
+三年甲班,13,張雅絜,113012,115
+三年甲班,14,林吏瑩,113014,115
+三年甲班,15,詹幃甯,113032,115
+三年甲班,16,蕭愉潔,113037,115
+三年乙班,1,李家郡,113001,115
+三年乙班,2,郭韋柏,113018,115
+三年乙班,3,陳昱辰,113035,115
+三年乙班,4,林權智,113002,115
+三年乙班,5,許士雄,113021,115
+三年乙班,6,張斈亦,113004,115
+三年乙班,7,蔡侑廷,113006,115
+三年乙班,8,黃仲唯,113007,115
+三年乙班,9,楊又瑾,113024,115
+三年乙班,10,陳姵蓁,113010,115
+三年乙班,11,林品均,113028,115
+三年乙班,12,廖宥欣,113029,115
+三年乙班,13,林歆澄,113015,115
+三年乙班,14,劉媜心,113016,115
+三年乙班,15,林芳熏,113033,115
+三年乙班,16,林昀臻,113017,115
+三年乙班,17,董文君,113034,115
+四年甲班,1,林揮憫,112020,115
+四年甲班,2,林佑宸,112022,115
+四年甲班,3,陳承裕,112004,115
+四年甲班,4,林威廷,112005,115
+四年甲班,5,林柏睿,112023,115
+四年甲班,6,何睿展,112006,115
+四年甲班,7,林元凱,112007,115
+四年甲班,8,陳星愷,112025,115
+四年甲班,9,陳亭羽,112028,115
+四年甲班,10,李梓榆,112029,115
+四年甲班,11,彭宸希,112030,115
+四年甲班,12,陳意尋,112012,115
+四年甲班,13,胡甯淇,112038,115
+四年甲班,14,張詠晴,112015,115
+四年甲班,15,廖玉晨,112016,115
+四年甲班,16,孫莛嵐,112017,115
+四年甲班,17,吳昀禎,112035,115
+四年甲班,18,郭禹彤,112036,115
+四年乙班,1,鄧夏夜,112001,115
+四年乙班,2,張舜銓,112019,115
+四年乙班,3,陳則均,112002,115
+四年乙班,4,張祐嘉,112003,115
+四年乙班,5,詹瓅崴,112021,115
+四年乙班,6,王彥允,112024,115
+四年乙班,7,陳定玨,112039,115
+四年乙班,8,吳俊融,112037,115
+四年乙班,9,丁芃溱,112026,115
+四年乙班,10,葉滋云,112009,115
+四年乙班,11,林品言,112010,115
+四年乙班,12,張吟安,112011,115
+四年乙班,13,李亮希,112013,115
+四年乙班,14,吳侑蓁,112031,115
+四年乙班,15,鄭瑜涵,112032,115
+四年乙班,16,李芸瑄,112014,115
+四年乙班,17,蘇語蓉,112033,115
+四年乙班,18,張可馨,112034,115
+四年乙班,19,廖苡琋,112018,115
+四年乙班,20,許譯予,112040,115
+五年甲班,1,葉建宏,111018,115
+五年甲班,2,許棋逸,111039,115
+五年甲班,3,林睿煜,111003,115
+五年甲班,4,張孝瑞,111022,115
+五年甲班,5,石振宇,111004,115
+五年甲班,6,張智翔,111024,115
+五年甲班,7,林宥翔,111006,115
+五年甲班,8,何崑銘,111025,115
+五年甲班,9,張凱鈞,111026,115
+五年甲班,10,楊舒貽,111009,115
+五年甲班,11,林樂婷,111027,115
+五年甲班,12,陳芃嫙,111010,115
+五年甲班,13,賴昫秀,111029,115
+五年甲班,14,廖昱晴,111011,115
+五年甲班,15,張巧蓁,111036,115
+五年甲班,16,曾愛,111032,115
+五年甲班,17,卓庭芸,111014,115
+五年甲班,18,張菱恩,111037,115
+五年甲班,19,廖妤心,111015,115
+五年甲班,20,董正君,111035,115
+五年乙班,1,許宥杰,111040,115
+五年乙班,2,洪翊程,111001,115
+五年乙班,3,林家榞,111019,115
+五年乙班,4,陳桓宇,111002,115
+五年乙班,5,廖苡恩,111020,115
+五年乙班,6,張詰詠,111021,115
+五年乙班,7,李子軒,111005,115
+五年乙班,8,黃禹皓,111023,115
+五年乙班,9,黃迦勒,111007,115
+五年乙班,10,林舒婷,111028,115
+五年乙班,11,陳宣妤,111012,115
+五年乙班,12,李芯羽,111030,115
+五年乙班,13,張宜芮,111031,115
+五年乙班,14,劉佩倢,111013,115
+五年乙班,15,闕翊庭,111033,115
+五年乙班,16,張宸瑄,111038,115
+五年乙班,17,鄭安妤,111034,115
+五年乙班,18,陳姵妤,111016,115
+五年乙班,19,邱弈沐,111017,115
+五年乙班,20,謝允睿,111041,115
+六年甲班,1,郭鴻霖,110001,115
+六年甲班,2,嚴昱惟,110023,115
+六年甲班,3,林建中,110002,115
+六年甲班,4,林承翰,110003,115
+六年甲班,5,吳長恩,110024,115
+六年甲班,6,許育瑞,110050,115
+六年甲班,7,丁芃宇,110026,115
+六年甲班,8,莊宸燁,110007,115
+六年甲班,9,洪莛羱,110028,115
+六年甲班,10,江昕庭,110010,115
+六年甲班,11,賴妍皙,110032,115
+六年甲班,12,蕭莛蓁,110033,115
+六年甲班,13,張依晨,110013,115
+六年甲班,14,陳沚筠,110035,115
+六年甲班,15,陳葦珊,110034,115
+六年甲班,16,林芮榆,110036,115
+六年甲班,17,王郁雯,110045,115
+六年甲班,18,邱弈臻,110039,115
+六年甲班,19,林家渝,110040,115
+六年甲班,20,林紫茵,110021,115
+六年甲班,21,林宜蒨,110041,115
+六年乙班,1,林俊吉,110022,115
+六年乙班,2,賴毓霆,110043,115
+六年乙班,3,曾寶,110004,115
+六年乙班,4,魏薪宸,110005,115
+六年乙班,5,李偉茗,110046,115
+六年乙班,6,張廷睿,110044,115
+六年乙班,7,張允致,110006,115
+六年乙班,8,林家豪,110027,115
+六年乙班,9,白昇翰,110008,115
+六年乙班,10,吳嫣然,110031,115
+六年乙班,11,林芷葳,110011,115
+六年乙班,12,王語萱,110012,115
+六年乙班,13,王宛儒,110049,115
+六年乙班,14,張宜蓁,110014,115
+六年乙班,15,吳芸蓁,110015,115
+六年乙班,16,鄭意潔,110017,115
+六年乙班,17,林慕函,110038,115
+六年乙班,18,林妍芝,110018,115
+六年乙班,19,林孟璇,110019,115
+六年乙班,20,吳怡蓁,110020,115
+六年乙班,21,張祐芯,110048,115`;
+
+  let parsed115Roster = null;
+  let parsedUpgradeRoster = null;
+  let currentMigrationPlan = null;
+
+  // CSV 解析輔助函式
+  function parseRosterCSV(csvText) {
+    if (!csvText) return [];
+    const cleanText = csvText.replace(/^\uFEFF/, '').trim();
+    const lines = cleanText.split(/\r?\n/).filter(line => line.trim() !== '');
+    if (lines.length < 2) return [];
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+    let classIdx = -1, seatIdx = -1, nameIdx = -1, idIdx = -1, yearIdx = -1;
+
+    headers.forEach((h, idx) => {
+      if (/班級|class/i.test(h)) classIdx = idx;
+      else if (/座號|seat/i.test(h)) seatIdx = idx;
+      else if (/姓名|name/i.test(h)) nameIdx = idx;
+      else if (/學號|student.*no|student.*id|id/i.test(h)) idIdx = idx;
+      else if (/學年度|年度|year/i.test(h)) yearIdx = idx;
+    });
+
+    if (classIdx === -1) classIdx = 0;
+    if (seatIdx === -1) seatIdx = 1;
+    if (nameIdx === -1) nameIdx = 2;
+    if (idIdx === -1 && headers.length > 3) idIdx = 3;
+    if (yearIdx === -1 && headers.length > 4) yearIdx = 4;
+
+    const list = [];
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(',').map(p => p.trim().replace(/^["']|["']$/g, ''));
+      if (parts.length <= Math.max(classIdx, seatIdx)) continue;
+
+      const className = parts[classIdx] || '';
+      const seatRaw = parts[seatIdx] || '';
+      const seatNumber = seatRaw ? String(parseInt(seatRaw, 10) || seatRaw) : '';
+      const realName = nameIdx !== -1 ? (parts[nameIdx] || '') : '';
+      const studentNo = idIdx !== -1 ? (parts[idIdx] || '') : '';
+      const academicYear = yearIdx !== -1 ? (parts[yearIdx] || '115') : '115';
+
+      if (className && seatNumber) {
+        list.push({
+          className,
+          seatNumber,
+          realName,
+          studentNo,
+          academicYear
+        });
+      }
+    }
+    return list;
+  }
+
+  // 子標籤切換
+  const tabBtnBind115 = document.getElementById('tab-btn-bind-115');
+  const tabBtnUpgradeFuture = document.getElementById('tab-btn-upgrade-future');
+  const panelBind115 = document.getElementById('panel-migration-bind115');
+  const panelUpgrade = document.getElementById('panel-migration-upgrade');
+
+  if (tabBtnBind115 && tabBtnUpgradeFuture) {
+    tabBtnBind115.onclick = () => {
+      tabBtnBind115.classList.add('active');
+      tabBtnUpgradeFuture.classList.remove('active');
+      if (panelBind115) panelBind115.style.display = 'block';
+      if (panelUpgrade) panelUpgrade.style.display = 'none';
+    };
+    tabBtnUpgradeFuture.onclick = () => {
+      tabBtnUpgradeFuture.classList.add('active');
+      tabBtnBind115.classList.remove('active');
+      if (panelBind115) panelBind115.style.display = 'none';
+      if (panelUpgrade) panelUpgrade.style.display = 'block';
+    };
+  }
+
+  // 115 名冊讀取與綁定
+  const btnLoad115 = document.getElementById('btn-load-115-embedded');
+  const inputCustom115 = document.getElementById('input-custom-115-file');
+  const box115Summary = document.getElementById('box-115-summary');
+  const stat115Year = document.getElementById('stat-115-year');
+  const stat115Classes = document.getElementById('stat-115-classes');
+  const stat115Students = document.getElementById('stat-115-students');
+  const stat115Coverage = document.getElementById('stat-115-coverage');
+  const btnSync115Classes = document.getElementById('btn-sync-115-classes');
+  const btnExecute115 = document.getElementById('btn-execute-115-binding');
+  const boxBindingProgress = document.getElementById('box-binding-progress');
+  const bindingProgressFill = document.getElementById('binding-progress-fill');
+  const bindingProgressPercent = document.getElementById('binding-progress-percent');
+  const bindingProgressStatus = document.getElementById('binding-progress-status');
+  const bindingLogTerminal = document.getElementById('binding-log-terminal');
+
+  function process115Roster(csvText, sourceName = 'student_115.csv') {
+    const list = parseRosterCSV(csvText);
+    if (!list || list.length === 0) {
+      alert('⚠️ 名冊 CSV 解析失敗，未找到有效學生資料行！');
+      return;
+    }
+
+    parsed115Roster = list;
+    const classes = Array.from(new Set(list.map(s => s.className)));
+    const hasIds = list.filter(s => s.studentNo).length;
+    const coverage = Math.round((hasIds / list.length) * 100);
+
+    if (stat115Year) stat115Year.innerText = list[0].academicYear || '115';
+    if (stat115Classes) stat115Classes.innerText = `${classes.length} 班`;
+    if (stat115Students) stat115Students.innerText = `${list.length} 人`;
+    if (stat115Coverage) stat115Coverage.innerText = `${coverage}%`;
+    if (box115Summary) box115Summary.style.display = 'block';
+
+    if (window.cloudSync && window.cloudSync.showToast) {
+      window.cloudSync.showToast(`✅ 成功讀取 115 學年度名冊 (${sourceName})！共 ${classes.length} 班、${list.length} 位學生`, 'success');
+    }
+  }
+
+  if (btnLoad115) {
+    btnLoad115.onclick = async () => {
+      try {
+        btnLoad115.disabled = true;
+        btnLoad115.innerText = '讀取中...';
+        const resp = await fetch('student_115.csv');
+        if (resp.ok) {
+          const text = await resp.text();
+          process115Roster(text, 'student_115.csv');
+        } else {
+          throw new Error('無法直接 fetch student_115.csv');
+        }
+      } catch (e) {
+        console.warn('使用內建 115 名冊資料載入:', e);
+        process115Roster(DEFAULT_115_ROSTER_CSV, '內建 115 名冊');
+      } finally {
+        btnLoad115.disabled = false;
+        btnLoad115.innerText = '⚡ 一鍵讀取目前 115 名冊 (216人)';
+      }
+    };
+  }
+
+  if (inputCustom115) {
+    inputCustom115.onchange = (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        process115Roster(evt.target.result, file.name);
+      };
+      reader.readAsText(file);
+    };
+  }
+
+  if (btnSync115Classes) {
+    btnSync115Classes.onclick = async () => {
+      if (!parsed115Roster || parsed115Roster.length === 0) {
+        alert('請先讀取 115 學年度名冊！');
+        return;
+      }
+      const classes = Array.from(new Set(parsed115Roster.map(s => s.className)));
+      ['教師示範組', '來賓體驗組'].forEach(extra => {
+        if (!classes.includes(extra)) classes.push(extra);
+      });
+
+      if (window.cloudSync) {
+        btnSync115Classes.disabled = true;
+        btnSync115Classes.innerText = '同步中...';
+        await window.cloudSync.saveClassList(classes);
+        renderClassTags();
+        window.cloudSync.populateClassSelects();
+        btnSync115Classes.disabled = false;
+        btnSync115Classes.innerText = '🔄 同步班級清單為全校下拉預設';
+        alert(`✅ 成功！全校班級選單已同步為名冊的 ${classes.length} 個班級！`);
+      }
+    };
+  }
+
+  if (btnExecute115) {
+    btnExecute115.onclick = async () => {
+      if (!parsed115Roster || parsed115Roster.length === 0) {
+        alert('請先點擊「⚡ 一鍵讀取目前 115 名冊」！');
+        return;
+      }
+
+      if (!confirm(`確定要為 115 學年度全校 ${parsed115Roster.length} 位學生執行身分綁定嗎？\n\n系統將自動把「學號」與「真實姓名」寫入雲端學生檔案中，學生原有之星幣、等級與密碼將完整保留！`)) {
+        return;
+      }
+
+      btnExecute115.disabled = true;
+      if (boxBindingProgress) boxBindingProgress.style.display = 'block';
+      if (bindingLogTerminal) bindingLogTerminal.innerHTML = '';
+
+      const appendLog = (msg) => {
+        if (!bindingLogTerminal) return;
+        const line = document.createElement('div');
+        line.innerText = msg;
+        bindingLogTerminal.appendChild(line);
+        bindingLogTerminal.scrollTop = bindingLogTerminal.scrollHeight;
+      };
+
+      const result = await window.cloudSync.bindStudentRoster(parsed115Roster, ({ current, total, percent, log }) => {
+        if (bindingProgressFill) bindingProgressFill.style.width = `${percent}%`;
+        if (bindingProgressPercent) bindingProgressPercent.innerText = `${percent}%`;
+        if (bindingProgressStatus) bindingProgressStatus.innerText = `進度：${current} / ${total} (${percent}%)`;
+        appendLog(log);
+      });
+
+      btnExecute115.disabled = false;
+      if (result.success) {
+        alert(`🎉 恭喜！全校 ${result.matchedCount} 位學生身分與學號已成功補齊綁定！\n班級選單亦已同步為全校 12 個班級！`);
+        loadStudentsRoster();
+      } else {
+        alert(`❌ 綁定失敗：${result.reason}`);
+      }
+    };
+  }
+
+  // 升級移轉 (Tab 2)
+  const upgradeDropzone = document.getElementById('upgrade-csv-dropzone');
+  const inputUpgradeFile = document.getElementById('input-upgrade-csv-file');
+  const upgradeFileNameHint = document.getElementById('upgrade-file-name-hint');
+  const btnPreviewMigration = document.getElementById('btn-preview-migration');
+  const boxUpgradePreview = document.getElementById('box-upgrade-preview');
+  const statUpgradeCount = document.getElementById('stat-upgrade-count');
+  const statNewCount = document.getElementById('stat-new-count');
+  const statGradCount = document.getElementById('stat-grad-count');
+  const upgradePreviewTableBody = document.getElementById('upgrade-preview-table-body');
+  const btnExecuteMigration = document.getElementById('btn-execute-migration');
+  const boxUpgradeProgress = document.getElementById('box-upgrade-progress');
+  const upgradeProgressFill = document.getElementById('upgrade-progress-fill');
+  const upgradeProgressPercent = document.getElementById('upgrade-progress-percent');
+  const upgradeProgressStatus = document.getElementById('upgrade-progress-status');
+  const upgradeLogTerminal = document.getElementById('upgrade-log-terminal');
+
+  function handleUpgradeCSVLoaded(text, filename) {
+    const list = parseRosterCSV(text);
+    if (!list || list.length === 0) {
+      alert('⚠️ 新學年 CSV 解析失敗，未找到學生資料！');
+      return;
+    }
+    parsedUpgradeRoster = list;
+    if (upgradeFileNameHint) {
+      upgradeFileNameHint.style.display = 'block';
+      upgradeFileNameHint.innerText = `📄 已選取：${filename}（共 ${list.length} 筆學生紀錄）`;
+    }
+    if (btnPreviewMigration) {
+      btnPreviewMigration.disabled = false;
+    }
+    if (window.cloudSync && window.cloudSync.showToast) {
+      window.cloudSync.showToast(`📄 已載入新學年名冊 (${filename})，請點擊「智慧比對並預覽」！`, 'success');
+    }
+  }
+
+  if (upgradeDropzone && inputUpgradeFile) {
+    upgradeDropzone.onclick = () => inputUpgradeFile.click();
+
+    upgradeDropzone.ondragover = (e) => {
+      e.preventDefault();
+      upgradeDropzone.classList.add('dragover');
+    };
+    upgradeDropzone.ondragleave = () => {
+      upgradeDropzone.classList.remove('dragover');
+    };
+    upgradeDropzone.ondrop = (e) => {
+      e.preventDefault();
+      upgradeDropzone.classList.remove('dragover');
+      const file = e.dataTransfer && e.dataTransfer.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => handleUpgradeCSVLoaded(evt.target.result, file.name);
+        reader.readAsText(file);
+      }
+    };
+
+    inputUpgradeFile.onchange = (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => handleUpgradeCSVLoaded(evt.target.result, file.name);
+        reader.readAsText(file);
+      }
+    };
+  }
+
+  if (btnPreviewMigration) {
+    btnPreviewMigration.onclick = async () => {
+      if (!parsedUpgradeRoster || parsedUpgradeRoster.length === 0) {
+        alert('請先上傳新學年度名冊 CSV！');
+        return;
+      }
+
+      const inputTargetYear = document.getElementById('input-target-year');
+      const targetYear = inputTargetYear ? inputTargetYear.value.trim() : '116';
+
+      btnPreviewMigration.disabled = true;
+      btnPreviewMigration.innerText = '比對分析中...';
+
+      const previewRes = await window.cloudSync.previewSchoolYearMigration(parsedUpgradeRoster, targetYear);
+      btnPreviewMigration.disabled = false;
+      btnPreviewMigration.innerText = '🔍 智慧比對並預覽升級分析報告';
+
+      if (!previewRes.success) {
+        alert(`❌ 比對分析失敗：${previewRes.reason}`);
+        return;
+      }
+
+      currentMigrationPlan = previewRes.plan;
+      if (statUpgradeCount) statUpgradeCount.innerText = previewRes.counts.upgrade;
+      if (statNewCount) statNewCount.innerText = previewRes.counts.newStudent;
+      if (statGradCount) statGradCount.innerText = previewRes.counts.graduated;
+
+      if (upgradePreviewTableBody) {
+        upgradePreviewTableBody.innerHTML = '';
+        previewRes.plan.forEach(item => {
+          const tr = document.createElement('tr');
+          const badgeClass = item.type === 'upgrade' ? 'badge-tag-upgrade' : (item.type === 'new_student' ? 'badge-tag-new' : 'badge-tag-graduated');
+
+          tr.innerHTML = `
+            <td><code>${item.studentNo || '-'}</code></td>
+            <td style="font-weight:bold; color:#fff;">${item.realName}</td>
+            <td style="color:var(--text-muted);">${item.oldClass} ${item.oldSeat !== '-' ? item.oldSeat + '號' : ''}</td>
+            <td style="font-weight:bold; color:#38bdf8;">${item.newClass} ${item.newSeat !== '-' ? item.newSeat + '號' : ''}</td>
+            <td style="text-align:center;"><span class="${badgeClass}">${item.statusText}</span></td>
+            <td style="font-size:0.75rem; color:#fbbf24;">${item.retainedSummary}</td>
+          `;
+          upgradePreviewTableBody.appendChild(tr);
+        });
+      }
+
+      if (boxUpgradePreview) boxUpgradePreview.style.display = 'block';
+      if (window.cloudSync && window.cloudSync.showToast) {
+        window.cloudSync.showToast(`✅ 升級分析完成！可升級：${previewRes.counts.upgrade} 人，新生：${previewRes.counts.newStudent} 人`, 'success');
+      }
+    };
+  }
+
+  if (btnExecuteMigration) {
+    btnExecuteMigration.onclick = async () => {
+      if (!currentMigrationPlan || currentMigrationPlan.length === 0) {
+        alert('請先進行智慧比對分析！');
+        return;
+      }
+
+      const inputSourceYear = document.getElementById('input-source-year');
+      const inputTargetYear = document.getElementById('input-target-year');
+      const srcYear = inputSourceYear ? inputSourceYear.value.trim() : '115';
+      const tgtYear = inputTargetYear ? inputTargetYear.value.trim() : '116';
+
+      if (!confirm(`⚠️【重要執行確認】\n\n您確定要將全校學生從【${srcYear} 學年度】正式升級移轉至【${tgtYear} 學年度】嗎？\n\n系統將自動完成：\n1. 將學生的通關密碼、暱稱、星幣、等級與商城物品移轉至新班級座號！\n2. 舊座號將乾淨釋出給新學年度學生使用！\n3. 全校選單將更新為 ${tgtYear} 學年度新班級清單！`)) {
+        return;
+      }
+
+      btnExecuteMigration.disabled = true;
+      if (boxUpgradeProgress) boxUpgradeProgress.style.display = 'block';
+      if (upgradeLogTerminal) upgradeLogTerminal.innerHTML = '';
+
+      const appendUpgradeLog = (msg) => {
+        if (!upgradeLogTerminal) return;
+        const line = document.createElement('div');
+        line.innerText = msg;
+        upgradeLogTerminal.appendChild(line);
+        upgradeLogTerminal.scrollTop = upgradeLogTerminal.scrollHeight;
+      };
+
+      const result = await window.cloudSync.executeSchoolYearMigration(currentMigrationPlan, srcYear, tgtYear, ({ current, total, percent, log }) => {
+        if (upgradeProgressFill) upgradeProgressFill.style.width = `${percent}%`;
+        if (upgradeProgressPercent) upgradeProgressPercent.innerText = `${percent}%`;
+        if (upgradeProgressStatus) upgradeProgressStatus.innerText = `升級進度：${current} / ${total} (${percent}%)`;
+        appendUpgradeLog(log);
+      });
+
+      btnExecuteMigration.disabled = false;
+      if (result.success) {
+        alert(`🎉 恭喜！${tgtYear} 學年度全校升級移轉已全數成功完成！\n學生登入時即可直接選擇新班級與新座號使用！`);
+        loadStudentsRoster();
+      } else {
+        alert(`❌ 移轉失敗：${result.reason}`);
+      }
+    };
+  }
 });
+

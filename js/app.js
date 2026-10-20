@@ -1948,14 +1948,40 @@ function initModals() {
   const loginModal = document.getElementById('modal-student-login');
   const loginForm = document.getElementById('form-student-login');
   const loginClassSel = document.getElementById('login-class-select');
+  const loginClassPasscodeGroup = document.getElementById('login-class-passcode-group');
+  const loginClassPasscodeInp = document.getElementById('login-class-passcode-input');
+  const loginClassPasscodeError = document.getElementById('login-class-passcode-error');
   const loginSeatInp = document.getElementById('login-seat-input');
   const loginNameInp = document.getElementById('login-name-input');
   const loginPassInp = document.getElementById('login-password-input');
   const loginPassError = document.getElementById('login-password-error');
 
+  function updateClassPasscodeVisibility(cls) {
+    if (!loginClassPasscodeGroup) return;
+    const isRequired = window.cloudSync ? window.cloudSync.isClassPasscodeRequired(cls) : false;
+    if (isRequired) {
+      loginClassPasscodeGroup.style.display = 'block';
+      if (loginClassPasscodeInp) loginClassPasscodeInp.required = true;
+    } else {
+      loginClassPasscodeGroup.style.display = 'none';
+      if (loginClassPasscodeInp) {
+        loginClassPasscodeInp.required = false;
+        loginClassPasscodeInp.value = '';
+      }
+    }
+    if (loginClassPasscodeError) loginClassPasscodeError.style.display = 'none';
+  }
+
+  if (loginClassSel) {
+    loginClassSel.addEventListener('change', () => {
+      updateClassPasscodeVisibility(loginClassSel.value);
+    });
+  }
+
   window.openStudentLoginModal = function() {
     if (loginClassSel) loginClassSel.value = '';
     if (loginPassError) loginPassError.style.display = 'none';
+    updateClassPasscodeVisibility('');
     if (loginModal) loginModal.classList.add('active');
   };
 
@@ -1968,11 +1994,28 @@ function initModals() {
       const passVal = loginPassInp ? loginPassInp.value.trim() : '';
 
       if (loginPassError) loginPassError.style.display = 'none';
+      if (loginClassPasscodeError) loginClassPasscodeError.style.display = 'none';
 
       if (!selClass || selClass === '=選擇班級=') {
         alert('⚠️ 請先選擇您的所屬班級喔！');
         if (loginClassSel) loginClassSel.focus();
         return;
+      }
+
+      // 需求 5: 班級專屬通關密碼驗證（若該班級老師有在後台開啟）
+      if (window.cloudSync && window.cloudSync.isClassPasscodeRequired(selClass)) {
+        const enteredClassPass = loginClassPasscodeInp ? loginClassPasscodeInp.value.trim() : '';
+        const isClassPassOk = window.cloudSync.verifyClassPasscode(selClass, enteredClassPass);
+        if (!isClassPassOk) {
+          if (loginClassPasscodeError) loginClassPasscodeError.style.display = 'block';
+          if (loginClassPasscodeInp) {
+            loginClassPasscodeInp.select();
+            loginClassPasscodeInp.focus();
+          }
+          return;
+        } else {
+          if (loginClassPasscodeError) loginClassPasscodeError.style.display = 'none';
+        }
       }
 
       if (!seatVal) {
@@ -2056,11 +2099,13 @@ function initModals() {
 
   const openAdminBtns = [
     document.getElementById('nav-btn-admin'),
-    document.getElementById('login-admin-quicklink')
+    document.getElementById('login-admin-quicklink'),
+    document.getElementById('login-teacher-quicklink')
   ].filter(Boolean);
 
   openAdminBtns.forEach(btn => {
-    btn.onclick = () => {
+    btn.onclick = (e) => {
+      if (e) e.preventDefault();
       window.open('admin.html', '_blank');
     };
   });

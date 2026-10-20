@@ -24,15 +24,16 @@ const DEFAULT_FIREBASE_CONFIG = {
 };
 window.DEFAULT_FIREBASE_CONFIG = DEFAULT_FIREBASE_CONFIG;
 
-// 預設全校班級清單（溪洲國小）
+// 預設全校班級清單（置頂體驗測試組，溪洲國小編制）
 const DEFAULT_CLASS_LIST = [
-  '1年1班', '1年2班',
-  '2年1班', '2年2班',
-  '3年1班', '3年2班', '3年3班',
-  '4年1班', '4年2班', '4年3班',
-  '5年1班', '5年2班', '5年3班', '5年4班',
-  '6年1班', '6年2班', '6年3班', '6年4班',
-  '教師示範組', '來賓體驗組'
+  '🧪 體驗測試組 (自由測試)',
+  '一年甲班', '一年乙班',
+  '二年甲班', '二年乙班',
+  '三年甲班', '三年乙班',
+  '四年甲班', '四年乙班',
+  '五年甲班', '五年乙班',
+  '六年甲班', '六年乙班',
+  '教師示範組'
 ];
 
 class CloudSyncManager {
@@ -42,9 +43,11 @@ class CloudSyncManager {
     this.classListKey = 'typehero_class_list';
     this.adminPasswordKey = 'typehero_admin_password';
     this.teacherPasscodeKey = 'typehero_teacher_passcode';
+    this.classPasscodesKey = 'typehero_class_passcodes';
 
     this.profile = this.loadProfile();
     this.classList = this.loadClassList();
+    this.classPasscodes = this.loadClassPasscodes();
     this.isFirebaseReady = false;
     this.db = null;
     this.config = null;
@@ -153,19 +156,24 @@ class CloudSyncManager {
       tagEl.innerText = `${this.profile.className} ${this.profile.seatNumber}號`;
     }
     if (nameEl && this.profile) {
-      nameEl.innerText = this.profile.nickname || '';
+      const displayName = this.profile.nickname || (this.profile.realName ? `${this.profile.realName}` : '');
+      nameEl.innerText = displayName;
     }
     if (titleEl && this.profile && !window.shopManager) {
-      titleEl.innerText = this.profile.nickname || '鍵盤學徒';
+      titleEl.innerText = this.profile.nickname || (this.profile.realName ? `${this.profile.realName}` : '鍵盤學徒');
     }
     if (badgeEl && this.profile) {
-      const showNick = this.profile.nickname ? ` · ${this.profile.nickname}` : '';
-      badgeEl.title = `目前學生：${this.profile.className} ${this.profile.seatNumber}號${showNick} (點擊可修改暱稱與密碼)`;
+      const namePart = this.profile.realName ? ` (${this.profile.realName})` : '';
+      const nickPart = this.profile.nickname ? ` · 暱稱: ${this.profile.nickname}` : '';
+      const noPart = this.profile.studentNo ? ` · 學號: ${this.profile.studentNo}` : '';
+      badgeEl.title = `目前學生：${this.profile.className} ${this.profile.seatNumber}號${namePart}${nickPart}${noPart} (點擊可修改暱稱與密碼)`;
     }
   }
 
   // ==========================================
   // 班級名單維護
+  // ==========================================
+  // 班級名單維護與智慧排序（置頂體驗測試組）
   // ==========================================
   loadClassList() {
     const raw = localStorage.getItem(this.classListKey);
@@ -173,19 +181,65 @@ class CloudSyncManager {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return this.getSortedClassList(parsed);
         }
       } catch (e) {
         console.error('讀取班級清單失敗', e);
       }
     }
-    return [...DEFAULT_CLASS_LIST];
+    return this.getSortedClassList([...DEFAULT_CLASS_LIST]);
+  }
+
+  /**
+   * 智慧班級排序演算法：
+   * 1. 「🧪 體驗測試組 (自由測試)」或包含「測試/體驗」的項目永遠置於最頂端 (Index 0)
+   * 2. 「教師示範組」置於測試組之後
+   * 3. 正常年級班級 (一年級～六年級甲乙班)
+   * 4. 其他自訂組別
+   */
+  getSortedClassList(classes) {
+    const list = Array.isArray(classes) && classes.length > 0 ? [...classes] : [...DEFAULT_CLASS_LIST];
+    const testKeywords = ['測試', '體驗', '自由測試', '來賓體驗'];
+
+    // 若清單內完全沒有測試項目，自動補入體驗測試組
+    const hasTest = list.some(c => testKeywords.some(k => String(c).includes(k)));
+    if (!hasTest) {
+      list.unshift('🧪 體驗測試組 (自由測試)');
+    }
+
+    const testItems = [];
+    const demoItems = [];
+    const gradeItems = [];
+    const otherItems = [];
+
+    list.forEach(item => {
+      const str = String(item || '').trim();
+      if (!str) return;
+      if (testKeywords.some(k => str.includes(k))) {
+        // 優先將標準「🧪 體驗測試組 (自由測試)」排在測試項第一位
+        if (str.includes('自由測試') || str.startsWith('🧪')) {
+          testItems.unshift(str);
+        } else {
+          testItems.push(str);
+        }
+      } else if (str.includes('示範')) {
+        demoItems.push(str);
+      } else if (/[一二三四五六123456]年/.test(str)) {
+        gradeItems.push(str);
+      } else {
+        otherItems.push(str);
+      }
+    });
+
+    // 依序組合並去重複，確保測試組永遠在最上方第 1 個
+    const combined = [...testItems, ...gradeItems, ...demoItems, ...otherItems];
+    return Array.from(new Set(combined));
   }
 
   saveClassList(classes) {
     if (!Array.isArray(classes)) return this.classList;
     const cleanList = Array.from(new Set(classes.map(c => String(c).trim()).filter(Boolean)));
-    this.classList = cleanList.length > 0 ? cleanList : [...DEFAULT_CLASS_LIST];
+    this.classList = cleanList.length > 0 ? this.getSortedClassList(cleanList) : this.getSortedClassList([...DEFAULT_CLASS_LIST]);
     localStorage.setItem(this.classListKey, JSON.stringify(this.classList));
 
     // 雲端同步
@@ -217,12 +271,104 @@ class CloudSyncManager {
   }
 
   resetClassList() {
-    this.classList = [...DEFAULT_CLASS_LIST];
+    this.classList = this.getSortedClassList([...DEFAULT_CLASS_LIST]);
     this.saveClassList(this.classList);
     return this.classList;
   }
 
+  // ==========================================
+  // 班級專屬通關密碼防護機制 (預設不開啟，防冒用與亂入)
+  // ==========================================
+  loadClassPasscodes() {
+    const raw = localStorage.getItem(this.classPasscodesKey);
+    if (raw) {
+      try {
+        const obj = JSON.parse(raw);
+        if (obj && typeof obj === 'object') return obj;
+      } catch (e) {
+        console.warn('讀取班級通關密碼快取失敗:', e);
+      }
+    }
+    return {};
+  }
+
+  getClassPasscodes() {
+    if (!this.classPasscodes || typeof this.classPasscodes !== 'object') {
+      this.classPasscodes = this.loadClassPasscodes();
+    }
+    return this.classPasscodes;
+  }
+
+  getClassPasscodeInfo(className) {
+    if (!className) return { enabled: false, passcode: '' };
+    const cleanName = String(className).trim();
+    // 自由測試組永遠免通關密碼，方便隨時體驗
+    if (cleanName.includes('測試') || cleanName.includes('體驗')) {
+      return { enabled: false, passcode: '' };
+    }
+    const all = this.getClassPasscodes();
+    const info = all[cleanName];
+    if (info && typeof info === 'object') {
+      return {
+        enabled: Boolean(info.enabled),
+        passcode: String(info.passcode || '').trim()
+      };
+    }
+    return { enabled: false, passcode: '' };
+  }
+
+  isClassPasscodeRequired(className) {
+    const info = this.getClassPasscodeInfo(className);
+    return info.enabled === true && info.passcode.length > 0;
+  }
+
+  verifyClassPasscode(className, inputPasscode) {
+    const info = this.getClassPasscodeInfo(className);
+    if (!info.enabled || !info.passcode) return true; // 未開啟防護則直接通過
+    const cleanInput = String(inputPasscode || '').trim();
+    return cleanInput === info.passcode;
+  }
+
+  async saveClassPasscode(className, enabled, passcode) {
+    const cleanName = String(className).trim();
+    if (!cleanName) return false;
+    const cleanPass = String(passcode || '').trim();
+    const isEnabled = Boolean(enabled) && cleanPass.length > 0;
+
+    const all = this.getClassPasscodes();
+    all[cleanName] = {
+      enabled: isEnabled,
+      passcode: isEnabled ? cleanPass : (all[cleanName] ? (all[cleanName].passcode || '') : ''),
+      updatedAt: new Date().toISOString()
+    };
+    this.classPasscodes = all;
+    localStorage.setItem(this.classPasscodesKey, JSON.stringify(all));
+
+    // 雲端同步到 Firestore config/school_config
+    if (this.isFirebaseReady && this.db) {
+      try {
+        await this.db.collection('config').doc('school_config').set({
+          classPasscodes: {
+            [cleanName]: {
+              enabled: isEnabled,
+              passcode: isEnabled ? cleanPass : '',
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }
+          },
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log(`☁️ 班級【${cleanName}】通關密碼防護已同步至雲端 (開啟: ${isEnabled})`);
+      } catch (err) {
+        console.error('儲存班級通關密碼至雲端失敗:', err);
+      }
+    }
+    return true;
+  }
+
   populateClassSelects(preferredClass) {
+    const sortedList = this.getSortedClassList(this.classList);
+    this.classList = sortedList;
+
     const selects = [
       document.getElementById('login-class-select'),
       document.getElementById('input-class-name'),
@@ -230,7 +376,7 @@ class CloudSyncManager {
       document.getElementById('admin-student-class-select')
     ].filter(Boolean);
 
-    const targetClass = preferredClass || this.profile.className || (this.classList[0] || '5年3班');
+    const targetClass = preferredClass || this.profile.className || (sortedList[0] || '🧪 體驗測試組 (自由測試)');
 
     selects.forEach(sel => {
       const isLoginClass = sel.id === 'login-class-select';
@@ -246,7 +392,7 @@ class CloudSyncManager {
         sel.appendChild(defaultOpt);
       }
 
-      this.classList.forEach(cls => {
+      sortedList.forEach(cls => {
         const opt = document.createElement('option');
         opt.value = cls;
         opt.innerText = cls;
@@ -256,12 +402,12 @@ class CloudSyncManager {
       });
 
       if (isLoginClass) {
-        if (!currentVal || !this.classList.includes(currentVal)) {
+        if (!currentVal || !sortedList.includes(currentVal)) {
           sel.value = '';
         }
       } else {
-        if (!this.classList.includes(currentVal) && this.classList.length > 0) {
-          sel.value = this.classList[0];
+        if (!sortedList.includes(currentVal) && sortedList.length > 0) {
+          sel.value = sortedList[0];
         }
       }
     });
@@ -282,14 +428,14 @@ class CloudSyncManager {
       allOpt.innerText = sel.id === 'admin-custom-target-class' ? '🌐 全校所有班級 (共用特訓)' : '🌐 全校共用特訓';
       sel.appendChild(allOpt);
 
-      this.classList.forEach(cls => {
+      sortedList.forEach(cls => {
         const opt = document.createElement('option');
         opt.value = cls;
         opt.innerText = cls;
         sel.appendChild(opt);
       });
 
-      if (currentVal && (currentVal === 'all' || this.classList.includes(currentVal))) {
+      if (currentVal && (currentVal === 'all' || sortedList.includes(currentVal))) {
         sel.value = currentVal;
       } else {
         sel.value = sel.id === 'custom-lesson-class-select' ? targetClass : 'all';
@@ -465,6 +611,10 @@ class CloudSyncManager {
         if (data.teacherPasscode) {
           localStorage.setItem(this.teacherPasscodeKey, data.teacherPasscode);
         }
+        if (data.classPasscodes && typeof data.classPasscodes === 'object') {
+          this.classPasscodes = Object.assign({}, this.loadClassPasscodes(), data.classPasscodes);
+          localStorage.setItem(this.classPasscodesKey, JSON.stringify(this.classPasscodes));
+        }
       } else {
         // 雲端首次執行，自動寫入預設班級清單與預設密碼建立 school_config
         await this.db.collection('config').doc('school_config').set({
@@ -519,6 +669,15 @@ class CloudSyncManager {
         if (cloudData.nickname) {
           this.profile.nickname = cloudData.nickname;
         }
+        if (cloudData.realName) {
+          this.profile.realName = cloudData.realName;
+        }
+        if (cloudData.studentNo) {
+          this.profile.studentNo = cloudData.studentNo;
+        }
+        if (cloudData.academicYear) {
+          this.profile.academicYear = cloudData.academicYear;
+        }
         this.profile.className = className;
         this.profile.seatNumber = seatNumber;
         this.profile.password = inputPassword || cloudData.password || '';
@@ -539,7 +698,7 @@ class CloudSyncManager {
         }
 
         // 3. 顯示漫遊成功視覺提示
-        const displayName = this.profile.nickname || `${className} ${seatNumber}號`;
+        const displayName = this.profile.nickname || this.profile.realName || `${className} ${seatNumber}號`;
         this.showToast(`☁️ 歡迎回來！已自雲端漫遊還原【${displayName}】的進度（Lv.${cloudData.level || 1} · ${cloudData.coins || 0} 星幣）`, 'success');
         return { success: true, data: cloudData };
       } else {
@@ -572,6 +731,9 @@ class CloudSyncManager {
         className: this.profile.className,
         seatNumber: this.profile.seatNumber,
         nickname: this.profile.nickname || '',
+        realName: this.profile.realName || '',
+        studentNo: this.profile.studentNo || '',
+        academicYear: this.profile.academicYear || '115',
         password: this.profile.password || '',
         level: Number(playerData.level) || 1,
         exp: Number(playerData.exp) || 0,
@@ -634,6 +796,405 @@ class CloudSyncManager {
     } catch (e) {
       console.error('教師後臺修改學生密碼失敗:', e);
       return false;
+    }
+  }
+
+  // ==========================================
+  // 全校名冊身分綁定與學年度升級移轉引擎
+  // ==========================================
+
+  /**
+   * 批次取得全校所有學生雲端文檔
+   */
+  async fetchAllStudents() {
+    if (!this.isFirebaseReady || !this.db) return [];
+    try {
+      const snapshot = await this.db.collection('students').get();
+      const list = [];
+      snapshot.forEach(doc => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      return list;
+    } catch (e) {
+      console.error('拉取全校學生紀錄失敗:', e);
+      return [];
+    }
+  }
+
+  /**
+   * 批次將 CSV 名冊資料與目前 Firestore 學生紀錄進行身分綁定
+   * @param {Array} rosterList - [{ className, seatNumber, realName, studentNo, academicYear }]
+   * @param {Function} onProgress - 回呼函式 ({ current, total, log, percent })
+   */
+  async bindStudentRoster(rosterList, onProgress = () => {}) {
+    if (!this.isFirebaseReady || !this.db) {
+      return { success: false, reason: 'Firebase 尚未連線就緒，請檢查雲端連線狀態！' };
+    }
+    if (!Array.isArray(rosterList) || rosterList.length === 0) {
+      return { success: false, reason: '傳入名冊為空，無法執行綁定。' };
+    }
+
+    try {
+      const total = rosterList.length;
+      let matchedCount = 0;
+      const classSet = new Set();
+
+      onProgress({ current: 0, total, percent: 0, log: `🚀 開始執行名冊身分綁定作業，共 ${total} 筆學生資料...` });
+
+      // 分批處理 (每次最多 400 筆，避免超過 Firestore 單次批次上限 500)
+      const chunkSize = 400;
+      for (let i = 0; i < total; i += chunkSize) {
+        const chunk = rosterList.slice(i, i + chunkSize);
+        const batch = this.db.batch();
+
+        for (let j = 0; j < chunk.length; j++) {
+          const item = chunk[j];
+          const currentIndex = i + j + 1;
+          const cleanClass = String(item.className || '').trim();
+          const cleanSeat = String(item.seatNumber || '').trim();
+          const cleanName = String(item.realName || '').trim();
+          const cleanNo = String(item.studentNo || '').trim();
+          const cleanYear = String(item.academicYear || '115').trim();
+
+          if (!cleanClass || !cleanSeat) continue;
+          classSet.add(cleanClass);
+
+          const studentId = `${cleanClass}_${cleanSeat}`;
+          const docRef = this.db.collection('students').doc(studentId);
+
+          // 寫入身分綁定 payload (以 merge: true 方式，不覆蓋學生原本之星幣、密碼與裝備)
+          const bindPayload = {
+            className: cleanClass,
+            seatNumber: cleanSeat,
+            realName: cleanName,
+            studentNo: cleanNo,
+            academicYear: cleanYear,
+            status: 'active',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+
+          batch.set(docRef, bindPayload, { merge: true });
+          matchedCount++;
+
+          const percent = Math.round((currentIndex / total) * 100);
+          if (currentIndex % 15 === 0 || currentIndex === total) {
+            onProgress({
+              current: currentIndex,
+              total,
+              percent,
+              log: `[${currentIndex}/${total}] 處理：${cleanClass} ${cleanSeat}號 ${cleanName} (學號: ${cleanNo || '無'})`
+            });
+          }
+        }
+
+        await batch.commit();
+      }
+
+      // 同步更新學校班級清單 (若有新班級)
+      if (classSet.size > 0) {
+        const sortedClasses = Array.from(classSet);
+        ['教師示範組', '來賓體驗組'].forEach(extra => {
+          if (!sortedClasses.includes(extra)) sortedClasses.push(extra);
+        });
+
+        this.classList = sortedClasses;
+        localStorage.setItem(this.classListKey, JSON.stringify(this.classList));
+        this.populateClassSelects();
+
+        // 寫入雲端學校設定
+        await this.db.collection('config').doc('school_config').set({
+          classList: this.classList,
+          currentAcademicYear: rosterList[0].academicYear || '115',
+          lastRosterSyncAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        onProgress({
+          current: total,
+          total,
+          percent: 100,
+          log: `✅ 班級清單已成功同步至全校雲端設定（共 ${sortedClasses.length} 個班級）！`
+        });
+      }
+
+      onProgress({
+        current: total,
+        total,
+        percent: 100,
+        log: `🎉 綁定完成！成功為全校 ${matchedCount} 位學生完成學號、姓名與 115 學年度身分綁定！`
+      });
+
+      return {
+        success: true,
+        total,
+        matchedCount,
+        classesCount: classSet.size
+      };
+    } catch (err) {
+      console.error('名冊身分綁定失敗:', err);
+      onProgress({ current: 0, total: rosterList.length, percent: 0, log: `❌ 發生錯誤: ${err.message}` });
+      return { success: false, reason: err.message };
+    }
+  }
+
+  /**
+   * 智慧比對並預覽新學年度升級移轉報告 (Dry-Run 模擬)
+   */
+  async previewSchoolYearMigration(newRosterList, targetYear) {
+    if (!this.isFirebaseReady || !this.db) {
+      return { success: false, reason: 'Firebase 尚未連線就緒！' };
+    }
+    if (!Array.isArray(newRosterList) || newRosterList.length === 0) {
+      return { success: false, reason: '請先上傳有效的新學年度名冊 CSV！' };
+    }
+
+    try {
+      const existingStudents = await this.fetchAllStudents();
+
+      // 建立現有資料庫快速索引 (優先以 studentNo 學號索引，其次以 realName 姓名索引)
+      const studentNoMap = new Map();
+      const realNameMap = new Map();
+
+      existingStudents.forEach(st => {
+        if (st.studentNo) {
+          studentNoMap.set(String(st.studentNo).trim(), st);
+        }
+        if (st.realName) {
+          realNameMap.set(String(st.realName).trim(), st);
+        }
+      });
+
+      const plan = [];
+      const matchedOldIds = new Set();
+
+      newRosterList.forEach(item => {
+        const cleanNo = String(item.studentNo || '').trim();
+        const cleanName = String(item.realName || '').trim();
+        const newClass = String(item.className || '').trim();
+        const newSeat = String(item.seatNumber || '').trim();
+
+        let matched = null;
+        let matchBy = '';
+
+        if (cleanNo && studentNoMap.has(cleanNo)) {
+          matched = studentNoMap.get(cleanNo);
+          matchBy = '學號比對';
+        } else if (cleanName && realNameMap.has(cleanName)) {
+          matched = realNameMap.get(cleanName);
+          matchBy = '姓名比對';
+        }
+
+        if (matched) {
+          matchedOldIds.add(matched.id);
+          const starsCount = matched.lessonStars ? Object.keys(matched.lessonStars).length : 0;
+          plan.push({
+            type: 'upgrade',
+            statusText: `🔄 升級對齊 (${matchBy})`,
+            studentNo: cleanNo || matched.studentNo || '',
+            realName: cleanName || matched.realName || '未知名',
+            oldClass: matched.className || '未知舊班',
+            oldSeat: matched.seatNumber || '0',
+            newClass: newClass,
+            newSeat: newSeat,
+            oldDocId: matched.id,
+            newDocId: `${newClass}_${newSeat}`,
+            retainedSummary: `Lv.${matched.level || 1} · 🪙 ${matched.coins || 0} · ⭐ ${starsCount}關 · 密碼: ${matched.password ? '已保留' : '無'}`,
+            originalData: matched
+          });
+        } else {
+          plan.push({
+            type: 'new_student',
+            statusText: '🆕 新生或轉入生',
+            studentNo: cleanNo,
+            realName: cleanName,
+            oldClass: '（新入學）',
+            oldSeat: '-',
+            newClass: newClass,
+            newSeat: newSeat,
+            newDocId: `${newClass}_${newSeat}`,
+            retainedSummary: '建立乾淨全新學籍檔案',
+            originalData: null
+          });
+        }
+      });
+
+      // 檢查原資料庫中未出現在新名冊中的學生 (例如畢業生)
+      existingStudents.forEach(oldSt => {
+        if (!matchedOldIds.has(oldSt.id) && oldSt.className && !oldSt.className.includes('示範') && !oldSt.className.includes('體驗')) {
+          plan.push({
+            type: 'graduated',
+            statusText: '🎓 畢業封存',
+            studentNo: oldSt.studentNo || '',
+            realName: oldSt.realName || oldSt.nickname || '舊生',
+            oldClass: oldSt.className,
+            oldSeat: oldSt.seatNumber || '0',
+            newClass: '（畢業歸檔）',
+            newSeat: '-',
+            oldDocId: oldSt.id,
+            retainedSummary: `已封存紀錄 (Lv.${oldSt.level || 1} · 🪙 ${oldSt.coins || 0})`,
+            originalData: oldSt
+          });
+        }
+      });
+
+      const upgradeCount = plan.filter(p => p.type === 'upgrade').length;
+      const newCount = plan.filter(p => p.type === 'new_student').length;
+      const gradCount = plan.filter(p => p.type === 'graduated').length;
+
+      return {
+        success: true,
+        plan,
+        counts: {
+          upgrade: upgradeCount,
+          newStudent: newCount,
+          graduated: gradCount,
+          total: plan.length
+        }
+      };
+    } catch (e) {
+      console.error('升級模擬比對失敗:', e);
+      return { success: false, reason: e.message };
+    }
+  }
+
+  /**
+   * 正式執行全校學生學年度升級移轉 (無損遷移)
+   */
+  async executeSchoolYearMigration(plan, sourceYear, targetYear, onProgress = () => {}) {
+    if (!this.isFirebaseReady || !this.db) {
+      return { success: false, reason: 'Firebase 尚未連線！' };
+    }
+    if (!Array.isArray(plan) || plan.length === 0) {
+      return { success: false, reason: '移轉計畫為空！' };
+    }
+
+    try {
+      const total = plan.length;
+      onProgress({ current: 0, total, percent: 0, log: `🚀 啟動學年度移轉程序：${sourceYear} 學年度 ➔ ${targetYear} 學年度...` });
+
+      const chunkSize = 400;
+      const classSet = new Set();
+
+      for (let i = 0; i < total; i += chunkSize) {
+        const chunk = plan.slice(i, i + chunkSize);
+        const batch = this.db.batch();
+
+        for (let j = 0; j < chunk.length; j++) {
+          const item = chunk[j];
+          const currentIndex = i + j + 1;
+
+          if (item.type === 'upgrade') {
+            classSet.add(item.newClass);
+            const newDocRef = this.db.collection('students').doc(item.newDocId);
+            const orig = item.originalData || {};
+
+            // 轉移並完整繼承全部成就、星幣、等級、密碼與商城解鎖
+            const migratedPayload = {
+              ...orig,
+              className: item.newClass,
+              seatNumber: item.newSeat,
+              realName: item.realName,
+              studentNo: item.studentNo,
+              academicYear: String(targetYear),
+              previousClass: item.oldClass,
+              previousSeat: item.oldSeat,
+              previousAcademicYear: String(sourceYear),
+              status: 'active',
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            batch.set(newDocRef, migratedPayload, { merge: true });
+
+            // 若舊座號不同，將舊學年紀錄標記為封存
+            if (item.oldDocId !== item.newDocId) {
+              const oldDocRef = this.db.collection('students').doc(item.oldDocId);
+              batch.set(oldDocRef, {
+                status: `archived_${sourceYear}`,
+                transferredTo: item.newDocId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+            }
+
+          } else if (item.type === 'new_student') {
+            classSet.add(item.newClass);
+            const newDocRef = this.db.collection('students').doc(item.newDocId);
+            batch.set(newDocRef, {
+              className: item.newClass,
+              seatNumber: item.newSeat,
+              realName: item.realName,
+              studentNo: item.studentNo,
+              academicYear: String(targetYear),
+              nickname: '',
+              password: '',
+              level: 1,
+              exp: 0,
+              coins: 0,
+              equippedSkin: 'default',
+              equippedSound: 'mechanical',
+              equippedAvatar: 'cat',
+              unlockedSkins: ['default'],
+              unlockedSounds: ['mechanical'],
+              unlockedAvatars: ['cat'],
+              lessonStars: {},
+              status: 'active',
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+          } else if (item.type === 'graduated') {
+            if (item.oldDocId) {
+              const oldDocRef = this.db.collection('students').doc(item.oldDocId);
+              batch.set(oldDocRef, {
+                status: `graduated_${sourceYear}`,
+                graduatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+            }
+          }
+
+          const percent = Math.round((currentIndex / total) * 100);
+          if (currentIndex % 15 === 0 || currentIndex === total) {
+            onProgress({
+              current: currentIndex,
+              total,
+              percent,
+              log: `[${currentIndex}/${total}] 執行：${item.realName} (${item.statusText})`
+            });
+          }
+        }
+
+        await batch.commit();
+      }
+
+      // 同步更新學校新學年度班級名冊與當前學年
+      if (classSet.size > 0) {
+        const sortedClasses = Array.from(classSet);
+        ['教師示範組', '來賓體驗組'].forEach(extra => {
+          if (!sortedClasses.includes(extra)) sortedClasses.push(extra);
+        });
+
+        this.classList = sortedClasses;
+        localStorage.setItem(this.classListKey, JSON.stringify(this.classList));
+        this.populateClassSelects();
+
+        await this.db.collection('config').doc('school_config').set({
+          classList: this.classList,
+          currentAcademicYear: String(targetYear),
+          lastMigrationAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+
+      onProgress({
+        current: total,
+        total,
+        percent: 100,
+        log: `🎉 恭喜！${targetYear} 學年度升級移轉已全數成功執行完畢！學生現在可直接以新班級座號登入！`
+      });
+
+      return { success: true, count: total };
+    } catch (e) {
+      console.error('升級移轉執行失敗:', e);
+      onProgress({ current: 0, total: plan.length, percent: 0, log: `❌ 移轉發生異常: ${e.message}` });
+      return { success: false, reason: e.message };
     }
   }
 

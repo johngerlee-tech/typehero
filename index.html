@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
-  <link rel="stylesheet" href="css/styles.css?v=2.5.3">
+  <link rel="stylesheet" href="css/styles.css?v=2.6.0">
   
   <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -559,6 +559,21 @@
             </select>
           </div>
 
+          <!-- 需求 5: 班級專屬通關密碼群組 (若老師有在後台開啟防護則動態顯示) -->
+          <div id="login-class-passcode-group" style="display: none; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 0.75rem 0.85rem;">
+            <label for="login-class-passcode-input" style="font-size:0.85rem; font-weight:bold; display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem; color: #fbbf24;">
+              <span style="display:flex; align-items:center; gap:0.4rem;">🛡️ 本班專屬通關密碼</span>
+              <span style="font-size:0.72rem; color: #fbbf24; font-weight:normal; background: rgba(245, 158, 11, 0.15); padding: 0.1rem 0.45rem; border-radius: 4px;">本班已開啟防護</span>
+            </label>
+            <input type="password" id="login-class-passcode-input" class="form-input" placeholder="請輸入任課老師說明的班級通關密碼" maxlength="20" autocomplete="off" style="border-color: rgba(245, 158, 11, 0.5);">
+            <span style="font-size:0.72rem; color:var(--text-muted); display:block; margin-top:0.3rem;">
+              🔒 此班級目前受防護，需先輸入任課老師設定的「班級通關密碼」才能登入。
+            </span>
+            <div id="login-class-passcode-error" style="color:#ef4444; font-size:0.75rem; font-weight:bold; display:none; margin-top:0.35rem;">
+              ❌ 班級通關密碼錯誤，請向任課老師確認！
+            </div>
+          </div>
+
           <div style="display: grid; grid-template-columns: 1fr 1.6fr; gap: 0.85rem;">
             <div>
               <label for="login-seat-input" style="font-size:0.85rem; font-weight:bold; display:flex; align-items:center; gap:0.4rem; margin-bottom:0.35rem;">
@@ -832,7 +847,7 @@
   <script src="js/audio.js?v=2.5.2"></script>
   <script src="js/lessons.js?v=2.5.2"></script>
   <script src="js/shop.js?v=2.5.2"></script>
-  <script src="js/firebase-config.js?v=2.5.2"></script>
-  <script src="js/app.js?v=2.5.3"></script>
+  <script src="js/firebase-config.js?v=2.6.1"></script>
+  <script src="js/app.js?v=2.6.1"></script>
 </body>
 </html>
