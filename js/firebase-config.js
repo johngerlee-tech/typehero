@@ -41,6 +41,7 @@ class CloudSyncManager {
     this.firebaseConfigKey = 'typehero_firebase_config';
     this.classListKey = 'typehero_class_list';
     this.adminPasswordKey = 'typehero_admin_password';
+    this.teacherPasscodeKey = 'typehero_teacher_passcode';
 
     this.profile = this.loadProfile();
     this.classList = this.loadClassList();
@@ -58,6 +59,33 @@ class CloudSyncManager {
   // ==========================================
   getAdminPassword() {
     return localStorage.getItem(this.adminPasswordKey) || '1234';
+  }
+
+  // 本校教師註冊與授權通關密碼機制 (預設 TK6341106)
+  getTeacherPasscode() {
+    return localStorage.getItem(this.teacherPasscodeKey) || 'TK6341106';
+  }
+
+  verifyTeacherPasscode(input) {
+    const target = this.getTeacherPasscode();
+    return String(input).trim() === target;
+  }
+
+  async saveTeacherPasscode(newCode) {
+    const clean = String(newCode || '').trim() || 'TK6341106';
+    localStorage.setItem(this.teacherPasscodeKey, clean);
+    if (this.isFirebaseReady && this.db) {
+      try {
+        await this.db.collection('config').doc('school_config').set({
+          teacherPasscode: clean,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log(`☁️ 本校教師註冊通關密碼已同步至雲端: [${clean}]`);
+      } catch (err) {
+        console.error('儲存教師通關密碼至雲端失敗:', err);
+      }
+    }
+    return clean;
   }
 
   verifyAdminPassword(input) {
@@ -434,11 +462,15 @@ class CloudSyncManager {
         if (data.adminPassword) {
           localStorage.setItem(this.adminPasswordKey, data.adminPassword);
         }
+        if (data.teacherPasscode) {
+          localStorage.setItem(this.teacherPasscodeKey, data.teacherPasscode);
+        }
       } else {
         // 雲端首次執行，自動寫入預設班級清單與預設密碼建立 school_config
         await this.db.collection('config').doc('school_config').set({
           classList: this.classList,
           adminPassword: this.getAdminPassword(),
+          teacherPasscode: this.getTeacherPasscode(),
           schoolName: '溪洲國小',
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -737,6 +769,9 @@ class CloudSyncManager {
   async signInWithGoogle() {
     if (!this.auth) {
       if (window.firebase && window.firebase.auth) {
+        if (!firebase.apps.length && this.config) {
+          firebase.initializeApp(this.config);
+        }
         this.auth = window.firebase.auth();
       } else {
         throw new Error('Firebase Auth 模組尚未載入，請確認已載入 firebase-auth-compat.js');
@@ -745,26 +780,81 @@ class CloudSyncManager {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     const result = await this.auth.signInWithPopup(provider);
-    const user = result.user;
+    return result.user;
+  }
 
-    // 將登入的教師資料登記/更新於 Firestore collection 'teachers'
-    if (user && this.isFirebaseReady && this.db) {
+  // 查詢該 Google UID 是否已是經審核通過的授權教師
+  async getTeacherStatus(uid) {
+    if (!uid) return null;
+    if (this.isFirebaseReady && this.db) {
       try {
-        await this.db.collection('teachers').doc(user.uid).set({
+        const doc = await this.db.collection('teachers').doc(uid).get();
+        if (doc.exists) {
+          return doc.data();
+        }
+      } catch (err) {
+        console.warn('查詢教師審核狀態警告:', err);
+      }
+    }
+    return null;
+  }
+
+  // 審核通過並登記教師資料至 Firestore
+  async approveTeacher(user) {
+    if (!user || !user.uid) return null;
+    if (this.isFirebaseReady && this.db) {
+      try {
+        const teacherData = {
           uid: user.uid,
           name: user.displayName || '本校老師',
           email: user.email || '',
           photoURL: user.photoURL || '',
           role: 'teacher',
+          approved: true,
           schoolName: '溪洲國小',
+          approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
           lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-        console.log(`✅ 教師 [${user.displayName} / ${user.email}] 身分驗證已登記！`);
+        };
+        await this.db.collection('teachers').doc(user.uid).set(teacherData, { merge: true });
+        console.log(`✅ 教師 [${user.displayName || user.email}] 已正式授權！`);
+        return teacherData;
       } catch (err) {
-        console.warn('寫入教師名冊警告:', err);
+        console.error('登記教師授權失敗:', err);
       }
     }
-    return user;
+    return null;
+  }
+
+  // 取得全校已授權教師名單
+  async fetchTeachersList() {
+    const list = [];
+    if (this.isFirebaseReady && this.db) {
+      try {
+        const snap = await this.db.collection('teachers').get();
+        snap.forEach(doc => {
+          list.push({ id: doc.id, ...doc.data() });
+        });
+      } catch (err) {
+        console.warn('拉取教師名冊警告:', err);
+      }
+    }
+    return list;
+  }
+
+  // 刪除教師帳號 (離校或不再任教)
+  async deleteTeacher(uid) {
+    if (!uid) return false;
+    if (this.isFirebaseReady && this.db) {
+      try {
+        await this.db.collection('teachers').doc(uid).delete();
+        console.log(`🗑️ 已成功刪除教師授權紀錄 [${uid}]`);
+        return true;
+      } catch (err) {
+        console.error('刪除教師紀錄失敗:', err);
+        throw err;
+      }
+    }
+    return false;
   }
 
   async signOut() {

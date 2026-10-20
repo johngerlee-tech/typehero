@@ -85,12 +85,33 @@ document.addEventListener('DOMContentLoaded', () => {
           throw new Error('未取得授權使用者資訊，請重試！');
         }
 
-        handleLoginSuccess({
-          name: user.displayName || '本校老師',
-          email: user.email || 'Google 認證教師',
-          photoURL: user.photoURL || '',
-          role: 'teacher'
-        });
+        // 查詢該 Google 帳號在雲端是否已通過通關密語審核 (approved === true)
+        let teacherRecord = null;
+        if (window.cloudSync && window.cloudSync.getTeacherStatus) {
+          teacherRecord = await window.cloudSync.getTeacherStatus(user.uid);
+        } else if (window.firebase && window.firebase.firestore && firebase.apps.length) {
+          try {
+            const doc = await firebase.firestore().collection('teachers').doc(user.uid).get();
+            if (doc.exists) teacherRecord = doc.data();
+          } catch (e) {}
+        }
+
+        // 若該 Google 帳號先前已成功通過通關密碼授權，直接進入教師後臺！
+        if (teacherRecord && teacherRecord.approved === true) {
+          if (window.cloudSync && window.cloudSync.approveTeacher) {
+            await window.cloudSync.approveTeacher(user);
+          }
+          handleLoginSuccess({
+            name: user.displayName || teacherRecord.name || '本校老師',
+            email: user.email || teacherRecord.email || 'Google 認證教師',
+            photoURL: user.photoURL || teacherRecord.photoURL || '',
+            role: 'teacher'
+          });
+          return;
+        }
+
+        // 尚未通過通關密語驗證 (新註冊或先前被管理者刪除者)，開啟通關密碼彈窗
+        promptTeacherPasscodeModal(user);
 
       } catch (err) {
         console.warn('Google 登入失敗或取消:', err);
@@ -242,6 +263,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const savePwdBtn = document.getElementById('admin-btn-save-password');
     const pwdHint = document.getElementById('admin-current-pwd-hint');
 
+    // 通關密語控制項
+    const teacherPasscodeInp = document.getElementById('admin-input-teacher-passcode');
+    const saveTeacherPasscodeBtn = document.getElementById('admin-btn-save-teacher-passcode');
+    const teacherPasscodeHint = document.getElementById('admin-current-teacher-passcode-hint');
+
+    // 卡片 5: 本校已授權教師帳號名單管理
+    const cardTeachers = document.getElementById('card-teachers-management');
+    const noticeTeachersLocked = document.getElementById('notice-teachers-locked');
+    const badgeTeachersRole = document.getElementById('badge-teachers-role');
+    const refreshTeachersBtn = document.getElementById('admin-btn-refresh-teachers');
+
     if (isTeacher) {
       if (cardSecurity) cardSecurity.classList.add('locked-card');
       if (noticeSecurityLocked) noticeSecurityLocked.style.display = 'flex';
@@ -250,6 +282,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (newPwdInp) newPwdInp.disabled = true;
       if (savePwdBtn) savePwdBtn.disabled = true;
       if (pwdHint) pwdHint.innerText = '••••';
+
+      if (teacherPasscodeInp) teacherPasscodeInp.disabled = true;
+      if (saveTeacherPasscodeBtn) saveTeacherPasscodeBtn.disabled = true;
+      if (teacherPasscodeHint) teacherPasscodeHint.innerText = '••••';
+
+      if (cardTeachers) cardTeachers.style.display = 'none'; // 對一般教師隱藏名冊管理卡片
     } else {
       if (cardSecurity) cardSecurity.classList.remove('locked-card');
       if (noticeSecurityLocked) noticeSecurityLocked.style.display = 'none';
@@ -258,6 +296,23 @@ document.addEventListener('DOMContentLoaded', () => {
       if (newPwdInp) newPwdInp.disabled = false;
       if (savePwdBtn) savePwdBtn.disabled = false;
       if (pwdHint && window.cloudSync) pwdHint.innerText = window.cloudSync.getAdminPassword();
+
+      if (teacherPasscodeInp) teacherPasscodeInp.disabled = false;
+      if (saveTeacherPasscodeBtn) saveTeacherPasscodeBtn.disabled = false;
+      if (teacherPasscodeHint && window.cloudSync) {
+        const curCode = window.cloudSync.getTeacherPasscode();
+        teacherPasscodeHint.innerText = curCode;
+        if (teacherPasscodeInp) teacherPasscodeInp.value = curCode;
+      }
+
+      if (cardTeachers) {
+        cardTeachers.style.display = 'block';
+        cardTeachers.classList.remove('locked-card');
+      }
+      if (noticeTeachersLocked) noticeTeachersLocked.style.display = 'none';
+      if (badgeTeachersRole) badgeTeachersRole.innerText = '👑 具備完全權限';
+      if (refreshTeachersBtn) refreshTeachersBtn.disabled = false;
+      loadTeachersList();
     }
   }
 
@@ -672,6 +727,213 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pwdHint) pwdHint.innerText = newPwd;
         newPasswordInput.value = '';
         alert('✅ 最高管理員密碼已更新！');
+      }
+    };
+  }
+
+  // =========================================================================
+  // 8. 教師首次授權通關密碼彈窗邏輯
+  // =========================================================================
+  function promptTeacherPasscodeModal(user) {
+    const modal = document.getElementById('modal-teacher-passcode');
+    const nameEl = document.getElementById('passcode-modal-name');
+    const emailEl = document.getElementById('passcode-modal-email');
+    const avatarEl = document.getElementById('passcode-modal-avatar');
+    const inputPass = document.getElementById('input-teacher-passcode');
+    const errEl = document.getElementById('teacher-passcode-error');
+    const formPass = document.getElementById('form-teacher-passcode');
+    const cancelBtn = document.getElementById('btn-cancel-passcode');
+    const closeBtn = document.getElementById('btn-close-passcode-modal');
+
+    if (nameEl) nameEl.innerText = `${user.displayName || '本校教師'} 老師`;
+    if (emailEl) emailEl.innerText = user.email || '';
+    if (avatarEl) {
+      if (user.photoURL) {
+        avatarEl.src = user.photoURL;
+        avatarEl.style.display = 'block';
+      } else {
+        avatarEl.style.display = 'none';
+      }
+    }
+    if (inputPass) inputPass.value = '';
+    if (errEl) errEl.style.display = 'none';
+
+    if (modal) modal.classList.add('active');
+    if (inputPass) setTimeout(() => inputPass.focus(), 150);
+
+    const closeModal = async () => {
+      if (modal) modal.classList.remove('active');
+      if (window.cloudSync && window.cloudSync.signOut) {
+        await window.cloudSync.signOut();
+      }
+    };
+
+    if (cancelBtn) cancelBtn.onclick = closeModal;
+    if (closeBtn) closeBtn.onclick = closeModal;
+
+    if (formPass) {
+      formPass.onsubmit = async (e) => {
+        e.preventDefault();
+        const entered = inputPass ? inputPass.value.trim() : '';
+        const correctCode = window.cloudSync ? window.cloudSync.getTeacherPasscode() : 'TK6341106';
+
+        if (entered === correctCode) {
+          if (errEl) errEl.style.display = 'none';
+          if (modal) modal.classList.remove('active');
+
+          // 通過通關密碼驗證，正式登記至雲端 Firestore 建立白名單憑證
+          if (window.cloudSync && window.cloudSync.approveTeacher) {
+            await window.cloudSync.approveTeacher(user);
+          }
+
+          if (window.cloudSync && window.cloudSync.showToast) {
+            window.cloudSync.showToast(`🎉 歡迎 ${user.displayName || '老師'}！教師後臺管理權限已正式開通！`, 'success');
+          } else {
+            alert(`🎉 歡迎 ${user.displayName || '老師'}！教師後臺管理權限已正式開通！`);
+          }
+
+          handleLoginSuccess({
+            name: user.displayName || '本校老師',
+            email: user.email || 'Google 認證教師',
+            photoURL: user.photoURL || '',
+            role: 'teacher'
+          });
+        } else {
+          if (errEl) errEl.style.display = 'block';
+          if (inputPass) {
+            inputPass.select();
+            inputPass.focus();
+          }
+        }
+      };
+    }
+  }
+
+  // =========================================================================
+  // 9. 已授權教師名單管理與通關密碼維護 (Master Admin Only)
+  // =========================================================================
+  async function loadTeachersList() {
+    const tbody = document.getElementById('admin-teachers-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:var(--text-muted);">正在載入教師名冊...</td></tr>';
+
+    let teachers = [];
+    if (window.cloudSync && window.cloudSync.fetchTeachersList) {
+      teachers = await window.cloudSync.fetchTeachersList();
+    }
+
+    if (!teachers || teachers.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:var(--text-muted);">目前尚無 Google 授權之教師帳號</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    teachers.forEach(t => {
+      const tr = document.createElement('tr');
+
+      let loginTimeStr = '剛剛';
+      if (t.lastLogin) {
+        if (typeof t.lastLogin.toDate === 'function') {
+          loginTimeStr = t.lastLogin.toDate().toLocaleString('zh-TW', { hour12: false });
+        } else if (typeof t.lastLogin === 'number') {
+          loginTimeStr = new Date(t.lastLogin).toLocaleString('zh-TW', { hour12: false });
+        }
+      }
+
+      tr.innerHTML = `
+        <td style="display:flex; align-items:center; gap:0.55rem;">
+          <img src="${t.photoURL || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + encodeURIComponent(t.name || 'teacher')}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; border:1px solid rgba(16,185,129,0.4);">
+          <span style="font-weight:700; color:var(--text-main); font-size:0.85rem;">${escapeHtml(t.name || '未具名教師')}</span>
+        </td>
+        <td>
+          <span style="font-family:monospace; color:var(--text-muted); font-size:0.8rem;">${escapeHtml(t.email || '(無 Email)')}</span>
+        </td>
+        <td style="color:var(--text-muted); font-size:0.75rem;">
+          ${escapeHtml(loginTimeStr)}
+        </td>
+        <td style="text-align:center;">
+          <span style="background:rgba(16,185,129,0.18); color:#34d399; padding:0.18rem 0.55rem; border-radius:4px; font-size:0.72rem; font-weight:700; border:1px solid rgba(16,185,129,0.35);">
+            🟢 授權中
+          </span>
+        </td>
+        <td style="text-align:center;">
+          <button class="btn-secondary btn-delete-teacher" data-uid="${escapeHtml(t.id || t.uid)}" data-name="${escapeHtml(t.name || '教師')}" data-email="${escapeHtml(t.email || '')}" style="padding:0.25rem 0.65rem; font-size:0.72rem; color:#f87171; border-color:rgba(239,68,68,0.35);">
+            🗑️ 移除授權
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // 綁定刪除教師授權按鈕
+    tbody.querySelectorAll('.btn-delete-teacher').forEach(btn => {
+      btn.onclick = async () => {
+        const uid = btn.getAttribute('data-uid');
+        const name = btn.getAttribute('data-name');
+        const email = btn.getAttribute('data-email');
+        if (!uid) return;
+
+        const ok = confirm(`⚠️ 確定要移除教師【${name}】(${email}) 的後臺管理授權嗎？\n\n移除後該 Google 帳號將無法登入教師後臺，若未來該老師需要登入，必須重新輸入正確通關密碼才能進入。`);
+        if (!ok) return;
+
+        try {
+          btn.disabled = true;
+          btn.innerText = '處理中...';
+          if (window.cloudSync && window.cloudSync.deleteTeacher) {
+            await window.cloudSync.deleteTeacher(uid);
+          }
+          if (window.cloudSync && window.cloudSync.showToast) {
+            window.cloudSync.showToast(`✅ 已成功移除教師【${name}】的授權！`, 'success');
+          } else {
+            alert(`✅ 已成功移除教師【${name}】的授權！`);
+          }
+          loadTeachersList();
+        } catch (err) {
+          alert('❌ 移除教師失敗：' + (err.message || '未知錯誤'));
+          btn.disabled = false;
+          btn.innerText = '🗑️ 移除授權';
+        }
+      };
+    });
+  }
+
+  // 重新整理教師名冊按鈕
+  const btnRefreshTeachers = document.getElementById('admin-btn-refresh-teachers');
+  if (btnRefreshTeachers) {
+    btnRefreshTeachers.onclick = () => {
+      loadTeachersList();
+    };
+  }
+
+  // 變更教師通關密碼按鈕
+  const btnSaveTeacherPasscode = document.getElementById('admin-btn-save-teacher-passcode');
+  const inputTeacherPasscode = document.getElementById('admin-input-teacher-passcode');
+  const teacherPasscodeHint = document.getElementById('admin-current-teacher-passcode-hint');
+
+  if (btnSaveTeacherPasscode && inputTeacherPasscode) {
+    btnSaveTeacherPasscode.onclick = async () => {
+      if (adminRole === 'teacher') {
+        alert('🔒 授課教師身分無權修改通關密碼。');
+        return;
+      }
+      const newCode = inputTeacherPasscode.value.trim();
+      if (!newCode) {
+        alert('⚠️ 請輸入有效的通關密語！');
+        inputTeacherPasscode.focus();
+        return;
+      }
+      if (window.cloudSync && window.cloudSync.saveTeacherPasscode) {
+        btnSaveTeacherPasscode.disabled = true;
+        btnSaveTeacherPasscode.innerText = '儲存中...';
+        await window.cloudSync.saveTeacherPasscode(newCode);
+        if (teacherPasscodeHint) teacherPasscodeHint.innerText = newCode;
+        btnSaveTeacherPasscode.disabled = false;
+        btnSaveTeacherPasscode.innerText = '💾 變更通關密語';
+        if (window.cloudSync.showToast) {
+          window.cloudSync.showToast(`✅ 教師註冊通關密語已成功變更為：${newCode}`, 'success');
+        } else {
+          alert(`✅ 教師註冊通關密語已成功變更為：${newCode}`);
+        }
       }
     };
   }
