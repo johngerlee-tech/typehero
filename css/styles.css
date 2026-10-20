@@ -508,7 +508,156 @@ main {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* 打字即時儀表板 (Stats Row) */
+/* 需求 0: 打字練功動態意象英雄圖示 */
+.animated-hero-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 0.5rem auto;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, rgba(56, 189, 248, 0.15) 70%, transparent 100%);
+  border-radius: var(--radius-full);
+  animation: heroFloat 3.5s infinite ease-in-out;
+}
+
+.animated-hero-icon .hero-glyph {
+  font-size: 3.2rem;
+  filter: drop-shadow(0 6px 16px rgba(99, 102, 241, 0.5));
+  animation: glyphPulse 3s infinite ease-in-out;
+  display: inline-block;
+}
+
+.animated-hero-icon .hero-sparkle {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 1.6rem;
+  filter: drop-shadow(0 0 10px #fbbf24);
+  animation: sparkleFlash 1.6s infinite ease-in-out;
+}
+
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes glyphPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08) rotate(3deg); }
+}
+
+@keyframes sparkleFlash {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.25) rotate(15deg); }
+}
+
+/* 需求 3: 鍵盤與側邊動態儀表板並列佈局 (避免縱向版面過長) */
+.keyboard-stage-wrapper {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1.25rem;
+  align-items: stretch;
+  width: 100%;
+}
+
+.stats-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.stats-sidebar .stat-box {
+  padding: 0.65rem 0.85rem;
+  gap: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.stats-sidebar .stat-icon {
+  width: 44px;
+  height: 44px;
+  font-size: 1.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+.stats-sidebar .stat-val {
+  font-size: 1.15rem;
+}
+
+.stats-sidebar .stat-title {
+  font-size: 0.68rem;
+}
+
+@media (max-width: 1024px) {
+  .keyboard-stage-wrapper {
+    grid-template-columns: 1fr;
+  }
+  .stats-sidebar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+/* 需求 5: 智慧輸入法防呆切換泡泡提示 */
+.ime-smart-alert {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  padding: 0.5rem 1.15rem;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.5);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: bounceAlert 0.4s ease-out, alertGlow 1.5s infinite alternate ease-in-out;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.ime-smart-alert.hidden {
+  opacity: 0;
+  transform: translate(-50%, -10px);
+  pointer-events: none;
+}
+
+@keyframes bounceAlert {
+  0% { transform: translate(-50%, -20px); opacity: 0; }
+  60% { transform: translate(-50%, 4px); opacity: 1; }
+  100% { transform: translate(-50%, 0); opacity: 1; }
+}
+
+@keyframes alertGlow {
+  0% { box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); }
+  100% { box-shadow: 0 8px 28px rgba(245, 158, 11, 0.75); }
+}
+
+/* 需求 6: 全螢幕練習模式沉浸樣式 */
+body.in-fullscreen-mode {
+  padding: 0.5rem 1rem;
+}
+body.in-fullscreen-mode header {
+  padding: 0.35rem 1rem;
+}
+body.in-fullscreen-mode .course-tabs-wrapper {
+  margin-bottom: 0.4rem;
+}
+body.in-fullscreen-mode .typing-arena {
+  margin-bottom: 0.5rem;
+}
+body.in-fullscreen-mode .map-section,
+body.in-fullscreen-mode footer {
+  display: none !important;
+}
+
+/* 打字即時儀表板 (Stats Row - 備用) */
 .stats-dashboard {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -1108,40 +1257,98 @@ main {
 
 .hand-palm-path {
   fill: url(#skin-gradient-palm);
-  stroke: rgba(220, 95, 65, 0.45);
-  stroke-width: 1.6;
+  stroke: rgba(200, 110, 80, 0.55);
+  stroke-width: 1.8;
   stroke-linejoin: round;
   stroke-linecap: round;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.08));
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.22));
 }
 
 .hand-finger-path {
   fill: url(#skin-gradient-finger);
-  stroke: rgba(220, 95, 65, 0.45);
-  stroke-width: 1.6;
+  stroke: rgba(190, 100, 70, 0.5);
+  stroke-width: 1.8;
   stroke-linejoin: round;
   stroke-linecap: round;
-  transition: stroke 0.15s ease, filter 0.15s ease;
+  filter: url(#skin-finger-shadow);
+  transition: all 0.12s ease;
 }
 
 .hand-finger-path.finger-active {
   fill: url(#skin-gradient-active);
-  stroke: #ef4444;
-  stroke-width: 2.4;
-  filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.75));
+  stroke: #f43f5e;
+  stroke-width: 2.6;
+  filter: drop-shadow(0 0 16px rgba(244, 63, 94, 0.85)) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
 }
 
 .finger-crease-line {
-  stroke: rgba(200, 85, 55, 0.4);
-  stroke-width: 1.2;
+  stroke: rgba(170, 80, 50, 0.45);
+  stroke-width: 1.4;
   stroke-linecap: round;
   fill: none;
 }
 
 .fingernail-path {
-  fill: rgba(255, 250, 245, 0.7);
-  stroke: rgba(255, 255, 255, 0.9);
-  stroke-width: 1.2;
+  fill: url(#skin-gradient-nail);
+  stroke: rgba(255, 235, 235, 0.8);
+  stroke-width: 1.1;
+  filter: drop-shadow(0 1px 2px rgba(100, 40, 20, 0.15));
+}
+
+/* 需求 2: 後臺學生帳號密碼管理表格樣式 */
+.admin-students-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+  text-align: left;
+}
+
+.admin-students-table th {
+  background: var(--bg-secondary);
+  padding: 0.45rem 0.6rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.admin-students-table td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  vertical-align: middle;
+}
+
+.admin-students-table tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-pwd-badge {
+  font-family: monospace;
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--brand-primary);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.admin-btn-action-mini {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.admin-btn-action-mini:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 .finger-target-beacon {

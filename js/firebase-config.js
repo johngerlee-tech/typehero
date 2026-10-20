@@ -96,16 +96,18 @@ class CloudSyncManager {
     return {
       className: '5年3班',
       seatNumber: '01',
-      nickname: '鍵盤小英雄',
+      nickname: '',
+      password: '',
       hasRegistered: false
     };
   }
 
-  saveProfile(className, seatNumber, nickname) {
+  saveProfile(className, seatNumber, nickname, password) {
     this.profile = { 
       className: String(className).trim() || '5年3班', 
       seatNumber: String(seatNumber).padStart(2, '0'), 
-      nickname: String(nickname).trim() || '鍵盤小英雄', 
+      nickname: String(nickname || '').trim(), 
+      password: password !== undefined ? String(password).trim() : (this.profile ? (this.profile.password || '') : ''),
       hasRegistered: true 
     };
     localStorage.setItem(this.storageKey, JSON.stringify(this.profile));
@@ -120,10 +122,11 @@ class CloudSyncManager {
       tagEl.innerText = `${this.profile.className} ${this.profile.seatNumber}號`;
     }
     if (titleEl && this.profile) {
-      titleEl.innerText = this.profile.nickname || '鍵盤小英雄';
+      titleEl.innerText = this.profile.nickname || '鍵盤學徒';
     }
     if (badgeEl && this.profile) {
-      badgeEl.title = `目前學生：${this.profile.className} ${this.profile.seatNumber}號 ${this.profile.nickname} (點擊可切換)`;
+      const showNick = this.profile.nickname ? ` ${this.profile.nickname}` : '';
+      badgeEl.title = `目前學生：${this.profile.className} ${this.profile.seatNumber}號${showNick} (點擊可切換)`;
     }
   }
 
@@ -390,11 +393,11 @@ class CloudSyncManager {
   }
 
   // ==========================================
-  // 雙向雲端漫遊核心：拉取學生雲端存檔 (換電腦時自動還原)
+  // 雙向雲端漫遊核心：拉取學生雲端存檔 (換電腦時自動還原 & 密碼驗證)
   // ==========================================
-  async loadProfileFromCloud(className, seatNumber) {
-    if (!this.isFirebaseReady || !this.db) return null;
-    if (!className || !seatNumber) return null;
+  async loadProfileFromCloud(className, seatNumber, inputPassword) {
+    if (!this.isFirebaseReady || !this.db) return { success: true, localOnly: true };
+    if (!className || !seatNumber) return { success: false, reason: '缺少班級或座號' };
 
     const studentId = `${className}_${seatNumber}`;
     try {
@@ -403,7 +406,20 @@ class CloudSyncManager {
 
       if (docSnap.exists) {
         const cloudData = docSnap.data();
-        console.log('🎉 成功拉取到雲端學生存檔！', cloudData);
+
+        // 專屬通行密碼驗證 (防止他人冒用學號)
+        if (cloudData.password) {
+          const cleanInput = String(inputPassword || '').trim();
+          const cleanCloud = String(cloudData.password).trim();
+          if (cleanInput && cleanCloud && cleanInput !== cleanCloud) {
+            console.warn(`❌ 學生 [${studentId}] 密碼驗證不符`);
+            return {
+              success: false,
+              error: 'PASSWORD_MISMATCH',
+              message: '❌ 密碼錯誤！該座號已有專屬密碼。\n若忘記密碼，請洽任課老師至「教師後臺」查看或重設！'
+            };
+          }
+        }
 
         // 1. 還原基本身份檔案
         if (cloudData.nickname) {
@@ -411,27 +427,39 @@ class CloudSyncManager {
         }
         this.profile.className = className;
         this.profile.seatNumber = seatNumber;
+        this.profile.password = inputPassword || cloudData.password || '';
         this.profile.hasRegistered = true;
         localStorage.setItem(this.storageKey, JSON.stringify(this.profile));
         this.updateProfileBadgeUI();
 
-        // 2. 還原 ShopManager 經濟與裝備進度（金幣、經驗、等級、關卡最高星、造型背包）
+        // 若雲端原本未設定密碼（舊紀錄），學生此回有設定，自動補存保護
+        if (!cloudData.password && inputPassword) {
+          await this.db.collection('students').doc(studentId).set({
+            password: String(inputPassword).trim()
+          }, { merge: true });
+        }
+
+        // 2. 還原 ShopManager 經濟與裝備進度
         if (window.shopManager) {
           window.shopManager.restoreFromCloud(cloudData);
         }
 
         // 3. 顯示漫遊成功視覺提示
-        this.showToast(`☁️ 歡迎回來！已自雲端漫遊還原【${this.profile.nickname}】的進度（Lv.${cloudData.level || 1} · ${cloudData.coins || 0} 星幣）`, 'success');
-        return cloudData;
+        const displayName = this.profile.nickname || `${className} ${seatNumber}號`;
+        this.showToast(`☁️ 歡迎回來！已自雲端漫遊還原【${displayName}】的進度（Lv.${cloudData.level || 1} · ${cloudData.coins || 0} 星幣）`, 'success');
+        return { success: true, data: cloudData };
       } else {
         console.log(`ℹ️ 雲端尚無 [${studentId}] 的歷史進度，將以目前本機設定初始化雲端存檔。`);
-        // 新座號首次使用，將現有基礎檔案註冊上傳
+        // 新座號首次使用，將現有基礎檔案註冊上傳，並綁定密碼
+        if (inputPassword) {
+          this.profile.password = String(inputPassword).trim();
+        }
         await this.syncProfileToCloud();
-        return null;
+        return { success: true, isNew: true };
       }
     } catch (e) {
       console.warn('拉取雲端學生個人存檔失敗:', e);
-      return null;
+      return { success: true, error: e };
     }
   }
 
@@ -449,7 +477,8 @@ class CloudSyncManager {
       const payload = {
         className: this.profile.className,
         seatNumber: this.profile.seatNumber,
-        nickname: this.profile.nickname || '鍵盤小英雄',
+        nickname: this.profile.nickname || '',
+        password: this.profile.password || '',
         level: Number(playerData.level) || 1,
         exp: Number(playerData.exp) || 0,
         coins: Number(playerData.coins) || 0,
@@ -468,6 +497,48 @@ class CloudSyncManager {
       return true;
     } catch (e) {
       console.error('雲端存檔同步失敗:', e);
+      return false;
+    }
+  }
+
+  // ==========================================
+  // 教師後臺管理：拉取班級學生清單與密碼重設
+  // ==========================================
+  async fetchClassStudents(className) {
+    if (!this.isFirebaseReady || !this.db) return [];
+    try {
+      const snapshot = await this.db.collection('students')
+        .where('className', '==', className)
+        .get();
+
+      const list = [];
+      snapshot.forEach(doc => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+
+      // 依座號排序
+      list.sort((a, b) => Number(a.seatNumber || 0) - Number(b.seatNumber || 0));
+      return list;
+    } catch (e) {
+      console.error('拉取班級學生名冊失敗:', e);
+      return [];
+    }
+  }
+
+  async adminUpdateStudentPassword(className, seatNumber, newPassword) {
+    if (!this.isFirebaseReady || !this.db) return false;
+    const cleanPass = String(newPassword).trim();
+    if (!cleanPass) return false;
+    const studentId = `${className}_${seatNumber}`;
+    try {
+      await this.db.collection('students').doc(studentId).set({
+        password: cleanPass,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      console.log(`✅ 教師後臺已將學生 [${studentId}] 密碼修改為：${cleanPass}`);
+      return true;
+    } catch (e) {
+      console.error('教師後臺修改學生密碼失敗:', e);
       return false;
     }
   }

@@ -144,6 +144,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // 需求 6: 全螢幕練習按鈕綁定
+  const fsBtn = document.getElementById('btn-fullscreen');
+  const fsIcon = document.getElementById('fullscreen-icon');
+  if (fsBtn) {
+    fsBtn.onclick = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.warn('全螢幕啟用受限:', err);
+        });
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    };
+
+    document.addEventListener('fullscreenchange', () => {
+      const isFs = !!document.fullscreenElement;
+      if (fsIcon) fsIcon.innerText = isFs ? '✕' : '⛶';
+      fsBtn.title = isFs ? '退出全螢幕 (Esc)' : '切換全螢幕練習模式';
+      document.body.classList.toggle('in-fullscreen-mode', isFs);
+      if (window.handsOverlay) {
+        window.handsOverlay.updatePositions();
+        window.handsOverlay.render();
+      }
+    });
+  }
+
   // 頂部導航列雲端狀態徽章點擊
   const cloudPill = document.getElementById('cloud-status-pill');
   if (cloudPill) {
@@ -161,9 +187,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const seatInp = document.getElementById('login-seat-input');
       const nameInp = document.getElementById('login-name-input');
       const classSel = document.getElementById('login-class-select');
+      const passInp = document.getElementById('login-password-input');
       if (seatInp) seatInp.value = p.seatNumber || '';
+      // 需求 1: 預設為空白，無暱稱時留空顯示「請設定您的暱稱」placeholder
       if (nameInp) nameInp.value = p.nickname || '';
       if (classSel) classSel.value = p.className || (window.cloudSync.classList[0] || '5年3班');
+      if (passInp) passInp.value = p.password || '';
     }
   }
 
@@ -206,6 +235,8 @@ function initInputListeners() {
   // 輸入法開始組字 (例如輸入 ㄌㄠˇ)
   inputEl.addEventListener('compositionstart', () => {
     gameState.isComposing = true;
+    const alertEl = document.getElementById('ime-smart-alert');
+    if (alertEl) alertEl.classList.add('hidden');
     const badge = document.getElementById('ime-preview-badge');
     if (badge) badge.classList.remove('hidden');
     const preview = document.getElementById('ime-preview-text');
@@ -248,6 +279,11 @@ function initInputListeners() {
     // 若正在輸入法組字中，放行所有鍵（讓微軟注音選字、方向鍵與 Enter 正常運作）
     if (gameState.isComposing || e.isComposing || e.key === 'Process') {
       return;
+    }
+
+    // 需求 5: 中文生字詞關卡若以英文狀態直接敲出字母，跳出防呆提醒切換 Shift
+    if (gameState.currentCategory === 'chinese' && !gameState.isComposing && /^[a-zA-Z]$/.test(e.key)) {
+      showImeSmartAlert();
     }
 
     if (e.key === 'Tab') {
@@ -304,6 +340,18 @@ function blurTyping() {
   if (inputEl) inputEl.blur();
   gameState.isFocused = false;
   document.getElementById('focus-alert').classList.remove('hidden');
+}
+
+// 需求 5: 智慧輸入法防呆切換泡泡提示
+let imeAlertTimer = null;
+function showImeSmartAlert() {
+  const alertEl = document.getElementById('ime-smart-alert');
+  if (!alertEl) return;
+  alertEl.classList.remove('hidden');
+  if (imeAlertTimer) clearTimeout(imeAlertTimer);
+  imeAlertTimer = setTimeout(() => {
+    alertEl.classList.add('hidden');
+  }, 4000);
 }
 
 // ----------------------------------------------------
@@ -728,50 +776,116 @@ class HandsOverlayManager {
       const nx = -uy;
       const ny = ux;
 
-      const wBase = cfg.wBase;
-      const wTip = cfg.wTip;
+      const isThumb = (f === 'LT' || f === 'RT');
+      const wBase = cfg.wBase * (isThumb ? 1.08 : 1.0);
+      const wTip = cfg.wTip * (isThumb ? 1.08 : 1.0);
 
+      // 需求 4: 人體工學三段擬真指節比例 (Knuckle -> PIP -> Waist -> DIP -> Rounded Tip Pad)
+      const rPip = 0.44;  // 近端指節 (PIP Joint)
+      const rDip = 0.74;  // 遠端指節 (DIP Joint)
+
+      const pipW = wBase * 0.94;
+      const waistW = wBase * 0.86;
+      const dipW = wTip * 1.06;
+
+      // 基底點 (Knuckle)
       const blx = bx + nx * (wBase / 2);
       const bly = by + ny * (wBase / 2);
       const brx = bx - nx * (wBase / 2);
       const bry = by - ny * (wBase / 2);
 
-      const tlx = tx + nx * (wTip / 2);
-      const tly = ty + ny * (wTip / 2);
-      const trx = tx - nx * (wTip / 2);
-      const try_ = ty - ny * (wTip / 2);
+      // 近端指節點 (PIP Joint)
+      const pipCx = bx + ux * (len * rPip);
+      const pipCy = by + uy * (len * rPip);
+      const pipLx = pipCx + nx * (pipW / 2);
+      const pipLy = pipCy + ny * (pipW / 2);
+      const pipRx = pipCx - nx * (pipW / 2);
+      const pipRy = pipCy - ny * (pipW / 2);
 
-      const fingerD = `M ${blx.toFixed(1)} ${bly.toFixed(1)} L ${tlx.toFixed(1)} ${tly.toFixed(1)} A ${(wTip/2).toFixed(1)} ${(wTip/2).toFixed(1)} 0 0 1 ${trx.toFixed(1)} ${try_.toFixed(1)} L ${brx.toFixed(1)} ${bry.toFixed(1)} Z`;
+      // 中節自然微收腰點
+      const waistCx = bx + ux * (len * 0.58);
+      const waistCy = by + uy * (len * 0.58);
+      const waistLx = waistCx + nx * (waistW / 2);
+      const waistLy = waistCy + ny * (waistW / 2);
+      const waistRx = waistCx - nx * (waistW / 2);
+      const waistRy = waistCy - ny * (waistW / 2);
 
-      // 指甲 (Fingernail)
-      const nLx = tx + nx * (wTip * 0.32) - ux * (wTip * 0.22);
-      const nLy = ty + ny * (wTip * 0.32) - uy * (wTip * 0.22);
-      const nRx = tx - nx * (wTip * 0.32) - ux * (wTip * 0.22);
-      const nRy = ty - ny * (wTip * 0.32) - uy * (wTip * 0.22);
-      const nTopX = tx + ux * (wTip * 0.22);
-      const nTopY = ty + uy * (wTip * 0.22);
-      const nailD = `M ${nLx.toFixed(1)} ${nLy.toFixed(1)} Q ${nTopX.toFixed(1)} ${nTopY.toFixed(1)} ${nRx.toFixed(1)} ${nRy.toFixed(1)} Q ${tx.toFixed(1)} ${(ty - uy * (wTip * 0.42)).toFixed(1)} ${nLx.toFixed(1)} ${nLy.toFixed(1)} Z`;
+      // 遠端指節點 (DIP Joint)
+      const dipCx = bx + ux * (len * rDip);
+      const dipCy = by + uy * (len * rDip);
+      const dipLx = dipCx + nx * (dipW / 2);
+      const dipLy = dipCy + ny * (dipW / 2);
+      const dipRx = dipCx - nx * (dipW / 2);
+      const dipRy = dipCy - ny * (dipW / 2);
 
-      // 關節摺痕線 (Creases)
-      const makeCrease = (ratio, wRatio) => {
-        const cx = bx + ux * len * ratio;
-        const cy = by + uy * len * ratio;
-        const w = (wBase + (wTip - wBase) * ratio) * wRatio;
-        const p1x = cx + nx * (w / 2) - ux * 1.5;
-        const p1y = cy + ny * (w / 2) - uy * 1.5;
-        const p2x = cx - nx * (w / 2) - ux * 1.5;
-        const p2y = cy - ny * (w / 2) - uy * 1.5;
-        return `M ${p1x.toFixed(1)} ${p1y.toFixed(1)} Q ${cx.toFixed(1)} ${(cy + uy * 2).toFixed(1)} ${p2x.toFixed(1)} ${p2y.toFixed(1)}`;
+      // 指尖飽滿肉墊指腹頂點 (Pulpar Tip Contour)
+      const tlx = tx + nx * (wTip * 0.48);
+      const tly = ty + ny * (wTip * 0.48);
+      const trx = tx - nx * (wTip * 0.48);
+      const try_ = ty - ny * (wTip * 0.48);
+      const tipApexX = tx + ux * (wTip * 0.36);
+      const tipApexY = ty + uy * (wTip * 0.36);
+
+      // 繪製擬真人手多段平滑人體工學貝茲曲面輪廓
+      const fingerD = `
+        M ${blx.toFixed(1)} ${bly.toFixed(1)}
+        Q ${((blx + pipLx)/2 + nx * 2).toFixed(1)} ${((bly + pipLy)/2).toFixed(1)}, ${pipLx.toFixed(1)} ${pipLy.toFixed(1)}
+        Q ${waistLx.toFixed(1)} ${waistLy.toFixed(1)}, ${dipLx.toFixed(1)} ${dipLy.toFixed(1)}
+        Q ${((dipLx + tlx)/2).toFixed(1)} ${((dipLy + tly)/2).toFixed(1)}, ${tlx.toFixed(1)} ${tly.toFixed(1)}
+        C ${(tlx + ux * (wTip * 0.32)).toFixed(1)} ${(tly + uy * (wTip * 0.32)).toFixed(1)}, ${(tipApexX + nx * 4).toFixed(1)} ${tipApexY.toFixed(1)}, ${tipApexX.toFixed(1)} ${tipApexY.toFixed(1)}
+        C ${(tipApexX - nx * 4).toFixed(1)} ${tipApexY.toFixed(1)}, ${(trx + ux * (wTip * 0.32)).toFixed(1)} ${(try_ + uy * (wTip * 0.32)).toFixed(1)}, ${trx.toFixed(1)} ${try_.toFixed(1)}
+        Q ${((dipRx + trx)/2).toFixed(1)} ${((dipRy + try_)/2).toFixed(1)}, ${dipRx.toFixed(1)} ${dipRy.toFixed(1)}
+        Q ${waistRx.toFixed(1)} ${waistRy.toFixed(1)}, ${pipRx.toFixed(1)} ${pipRy.toFixed(1)}
+        Q ${((brx + pipRx)/2 - nx * 2).toFixed(1)} ${((bry + pipRy)/2).toFixed(1)}, ${brx.toFixed(1)} ${bry.toFixed(1)}
+        Z
+      `;
+
+      // 擬真指甲 (立體甲緣與弧形高光指甲)
+      const nailLen = wTip * 0.65;
+      const nailW = wTip * 0.68;
+      const nBaseCx = tx - ux * (nailLen * 0.45);
+      const nBaseCy = ty - uy * (nailLen * 0.45);
+      const nTipCx = tx + ux * (nailLen * 0.35);
+      const nTipCy = ty + uy * (nailLen * 0.35);
+
+      const nblX = nBaseCx + nx * (nailW * 0.45);
+      const nblY = nBaseCy + ny * (nailW * 0.45);
+      const nbrX = nBaseCx - nx * (nailW * 0.45);
+      const nbrY = nBaseCy - ny * (nailW * 0.45);
+
+      const ntlX = nTipCx + nx * (nailW * 0.40);
+      const ntlY = nTipCy + ny * (nailW * 0.40);
+      const ntrX = nTipCx - nx * (nailW * 0.40);
+      const ntrY = nTipCy - ny * (nailW * 0.40);
+
+      const nailD = `
+        M ${nblX.toFixed(1)} ${nblY.toFixed(1)}
+        C ${(nblX + nx * 1.5).toFixed(1)} ${(nblY + uy * 2).toFixed(1)}, ${(ntlX + nx * 1.5).toFixed(1)} ${(ntlY - uy * 2).toFixed(1)}, ${ntlX.toFixed(1)} ${ntlY.toFixed(1)}
+        Q ${nTipCx.toFixed(1)} ${(nTipCy + uy * 2).toFixed(1)}, ${ntrX.toFixed(1)} ${ntrY.toFixed(1)}
+        C ${(ntrX - nx * 1.5).toFixed(1)} ${(ntrY - uy * 2).toFixed(1)}, ${(nbrX - nx * 1.5).toFixed(1)} ${(nbrY + uy * 2).toFixed(1)}, ${nbrX.toFixed(1)} ${nbrY.toFixed(1)}
+        Q ${nBaseCx.toFixed(1)} ${(nBaseCy - uy * 1.5).toFixed(1)}, ${nblX.toFixed(1)} ${nblY.toFixed(1)}
+        Z
+      `;
+
+      // 擬真人手指關節雙褶皺 (Natural skin creases at PIP and DIP)
+      const makeCrease = (cx, cy, cw, curveAmp) => {
+        const p1x = cx + nx * (cw / 2) - ux * 0.8;
+        const p1y = cy + ny * (cw / 2) - uy * 0.8;
+        const p2x = cx - nx * (cw / 2) - ux * 0.8;
+        const p2y = cy - ny * (cw / 2) - uy * 0.8;
+        return `M ${p1x.toFixed(1)} ${p1y.toFixed(1)} Q ${cx.toFixed(1)} ${(cy + uy * curveAmp).toFixed(1)} ${p2x.toFixed(1)} ${p2y.toFixed(1)}`;
       };
 
-      const crease1 = makeCrease(0.42, 0.48);
-      const crease2 = makeCrease(0.70, 0.44);
+      const creasePip1 = makeCrease(pipCx - ux * 1.5, pipCy - uy * 1.5, pipW * 0.62, 2.2);
+      const creasePip2 = makeCrease(pipCx + ux * 1.8, pipCy + uy * 1.8, pipW * 0.54, 1.8);
+      const creaseDip = makeCrease(dipCx, dipCy, dipW * 0.58, 2.0);
 
       fingersHtml += `
         <g class="finger-group" id="hand-finger-${f}">
           <path class="hand-finger-path ${isActive ? 'finger-active' : ''}" d="${fingerD}" />
-          <path class="finger-crease-line" d="${crease1}" />
-          <path class="finger-crease-line" d="${crease2}" />
+          <path class="finger-crease-line" d="${creasePip1}" />
+          <path class="finger-crease-line" d="${creasePip2}" />
+          <path class="finger-crease-line" d="${creaseDip}" />
           <path class="fingernail-path" d="${nailD}" />
         </g>
       `;
@@ -913,12 +1027,42 @@ function loadCategory(category) {
   if (!courseList || courseList.length === 0) return;
 
   const badgeEl = document.getElementById('stage-mode-badge');
+  const inputEl = document.getElementById('typing-input');
+  const imeIcon = document.getElementById('ime-guide-icon');
+  const imeIconBg = document.getElementById('ime-guide-icon-bg');
+  const imeModeText = document.getElementById('ime-guide-mode-text');
+  const imeHintText = document.getElementById('ime-guide-hint-text');
+
   if (category === 'zhuyin') {
     badgeEl.innerText = '🇹🇼 台灣大千注音盲打特訓';
+    if (inputEl) {
+      inputEl.setAttribute('inputmode', 'latin');
+      inputEl.setAttribute('lang', 'en');
+    }
+    if (imeIcon) imeIcon.innerText = '🔤';
+    if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #38bdf8, #0284c7)';
+    if (imeModeText) imeModeText.innerText = '英數 / 盲打實體鍵';
+    if (imeHintText) imeHintText.innerText = '直接敲擊實體按鍵盲打 (請確認切為英文)';
   } else if (category === 'chinese') {
     badgeEl.innerText = '📖 國小生字詞與全形標點選字';
+    if (inputEl) {
+      inputEl.setAttribute('inputmode', 'text');
+      inputEl.setAttribute('lang', 'zh-TW');
+    }
+    if (imeIcon) imeIcon.innerText = '🇹🇼';
+    if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+    if (imeModeText) imeModeText.innerText = '微軟注音 / 中文字詞';
+    if (imeHintText) imeHintText.innerText = '請按 Shift 切為注音，打完注音按空白選字';
   } else {
     badgeEl.innerText = '🔤 國小標準英文盲打挑戰';
+    if (inputEl) {
+      inputEl.setAttribute('inputmode', 'latin');
+      inputEl.setAttribute('lang', 'en');
+    }
+    if (imeIcon) imeIcon.innerText = '🔤';
+    if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #38bdf8, #0284c7)';
+    if (imeModeText) imeModeText.innerText = '英數 / 盲打實體鍵';
+    if (imeHintText) imeHintText.innerText = '直接敲擊實體按鍵盲打 (請確認切為英文)';
   }
 
   // 繪製關卡地圖卡片 (含鎖定判定)
@@ -1371,6 +1515,8 @@ function initModals() {
   const loginClassSel = document.getElementById('login-class-select');
   const loginSeatInp = document.getElementById('login-seat-input');
   const loginNameInp = document.getElementById('login-name-input');
+  const loginPassInp = document.getElementById('login-password-input');
+  const loginPassError = document.getElementById('login-password-error');
 
   if (loginForm) {
     loginForm.onsubmit = async (e) => {
@@ -1378,6 +1524,9 @@ function initModals() {
       const selClass = loginClassSel ? loginClassSel.value : '5年3班';
       const seatVal = loginSeatInp ? loginSeatInp.value.trim() : '';
       const nameVal = loginNameInp ? loginNameInp.value.trim() : '';
+      const passVal = loginPassInp ? loginPassInp.value.trim() : '';
+
+      if (loginPassError) loginPassError.style.display = 'none';
 
       if (!seatVal) {
         alert('⚠️ 請輸入學生座號喔！');
@@ -1389,13 +1538,33 @@ function initModals() {
         if (loginNameInp) loginNameInp.focus();
         return;
       }
+      if (!passVal) {
+        alert('⚠️ 請設定或輸入學生通行密碼！');
+        if (loginPassInp) loginPassInp.focus();
+        return;
+      }
 
       if (window.cloudSync) {
-        window.cloudSync.saveProfile(selClass, seatVal, nameVal);
+        // 先向雲端查詢並驗證密碼
+        const cloudRes = await window.cloudSync.loadProfileFromCloud(selClass, seatVal, passVal);
 
-        // 核心：自雲端漫遊還原此座號在全校其他電腦累積的等級、星幣、外觀與星星！
-        const cloudData = await window.cloudSync.loadProfileFromCloud(selClass, seatVal);
-        if (cloudData) {
+        if (cloudRes && cloudRes.error === 'PASSWORD_MISMATCH') {
+          if (loginPassError) {
+            loginPassError.style.display = 'block';
+            if (loginPassInp) {
+              loginPassInp.select();
+              loginPassInp.focus();
+            }
+          } else {
+            alert(cloudRes.message || '密碼錯誤！');
+          }
+          return;
+        }
+
+        window.cloudSync.saveProfile(selClass, seatVal, nameVal, passVal);
+
+        if (cloudRes && cloudRes.data) {
+          const cloudData = cloudRes.data;
           // 若有輸入新暱稱，同步更新到雲端
           if (nameVal && nameVal !== cloudData.nickname) {
             window.cloudSync.profile.nickname = nameVal;
@@ -1469,6 +1638,9 @@ function initModals() {
 
         // 自動執行一次 Firebase 即時連線診斷
         runFirebaseDiagnostic();
+
+        // 需求 2: 自動載入學生帳號與通行密碼管理名冊
+        renderAdminStudentTable();
       } else {
         if (authErrorEl) authErrorEl.style.display = 'block';
         if (authPasswordInp) {
@@ -1673,6 +1845,145 @@ async function runFirebaseDiagnostic() {
       </div>
     `;
   }
+}
+
+/**
+ * 需求 2: 繪製教師後臺之學生帳號與通行密碼名冊 (支援依班級篩選與即時重設密碼)
+ */
+function renderAdminStudentTable() {
+  const container = document.getElementById('admin-students-table-container');
+  const classFilter = document.getElementById('admin-student-class-filter');
+  const refreshBtn = document.getElementById('admin-btn-refresh-students');
+  if (!container || !window.cloudSync) return;
+
+  // 1. 填充班級篩選下拉選單
+  if (classFilter) {
+    const classList = window.cloudSync.classList || ['5年3班'];
+    const currentVal = classFilter.value || (window.cloudSync.profile ? window.cloudSync.profile.className : classList[0]);
+    classFilter.innerHTML = classList.map(cls => `<option value="${cls}" ${cls === currentVal ? 'selected' : ''}>${cls}</option>`).join('');
+
+    classFilter.onchange = () => {
+      loadStudentsForClass(classFilter.value);
+    };
+  }
+
+  // 2. 重新整理按鈕
+  if (refreshBtn) {
+    refreshBtn.onclick = () => {
+      const cls = classFilter ? classFilter.value : (window.cloudSync.profile ? window.cloudSync.profile.className : '5年3班');
+      loadStudentsForClass(cls);
+    };
+  }
+
+  // 3. 預設載入選定班級名冊
+  const initialClass = classFilter ? classFilter.value : (window.cloudSync.profile ? window.cloudSync.profile.className : '5年3班');
+  loadStudentsForClass(initialClass);
+}
+
+window.renderAdminStudentTable = renderAdminStudentTable;
+
+/**
+ * 自雲端載入指定班級的所有學生帳號、密碼與打字進度
+ */
+async function loadStudentsForClass(className) {
+  const container = document.getElementById('admin-students-table-container');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="text-align:center; padding:1.2rem; font-size:0.78rem; color:var(--text-muted);">
+      🔄 正在自 Firebase 讀取【${className}】學生帳號名冊...
+    </div>
+  `;
+
+  if (!window.cloudSync) {
+    container.innerHTML = '<div style="text-align:center; padding:1.2rem; color:#ef4444; font-size:0.78rem;">雲端模組未載入</div>';
+    return;
+  }
+
+  const list = await window.cloudSync.fetchClassStudents(className);
+
+  if (!list || list.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:1.5rem; font-size:0.8rem; color:var(--text-muted); line-height:1.6;">
+        📂 班級【${className}】目前尚無學生雲端帳號紀錄。<br>
+        <span style="font-size:0.72rem; color:var(--text-muted);">（學生於首頁登入並輸入密碼後，系統會自動雲端建檔並顯示於此名冊）</span>
+      </div>
+    `;
+    return;
+  }
+
+  let tableHtml = `
+    <table class="admin-students-table">
+      <thead>
+        <tr>
+          <th style="width: 50px;">座號</th>
+          <th>暱稱 / 姓名</th>
+          <th style="width: 90px;">通行密碼</th>
+          <th style="width: 65px;">等級</th>
+          <th style="width: 75px;">星幣</th>
+          <th style="width: 80px; text-align: center;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  list.forEach(stu => {
+    const seat = stu.seatNumber || '00';
+    const nickname = stu.nickname ? stu.nickname : '<span style="color:var(--text-muted); font-style:italic;">尚未設定</span>';
+    const pwd = stu.password || '無';
+    const level = stu.level || 1;
+    const coins = stu.coins || 0;
+
+    tableHtml += `
+      <tr>
+        <td style="font-weight:bold; color:var(--brand-primary);">${seat}號</td>
+        <td><strong>${nickname}</strong></td>
+        <td><span class="admin-pwd-badge" title="學生通行密碼">${pwd}</span></td>
+        <td>Lv.${level}</td>
+        <td>💰 ${coins}</td>
+        <td style="text-align:center;">
+          <button class="admin-btn-action-mini btn-reset-pwd" data-seat="${seat}" data-name="${stu.nickname || ''}" data-pwd="${pwd}" title="重設此學生密碼">
+            🔑 修改
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tableHtml += `
+      </tbody>
+    </table>
+  `;
+
+  container.innerHTML = tableHtml;
+
+  // 綁定重設密碼按鈕事件
+  container.querySelectorAll('.btn-reset-pwd').forEach(btn => {
+    btn.onclick = async () => {
+      const seat = btn.dataset.seat;
+      const sName = btn.dataset.name || `${seat}號學生`;
+      const oldPwd = btn.dataset.pwd !== '無' ? btn.dataset.pwd : '';
+      const input = prompt(`【密碼維護】請輸入 ${className} ${seat}號（${sName}）的新通行密碼：`, oldPwd || '1234');
+      if (input !== null) {
+        const newPwd = input.trim();
+        if (!newPwd) {
+          alert('⚠️ 密碼不可為空白！');
+          return;
+        }
+        btn.disabled = true;
+        btn.innerText = '處理中...';
+        const ok = await window.cloudSync.adminUpdateStudentPassword(className, seat, newPwd);
+        if (ok) {
+          alert(`✅ 成功！已將 ${className} ${seat}號 密碼重設為：【 ${newPwd} 】`);
+          loadStudentsForClass(className);
+        } else {
+          alert('❌ 密碼變更失敗，請確認 Firebase 網路連線狀態。');
+          btn.disabled = false;
+          btn.innerText = '🔑 修改';
+        }
+      }
+    };
+  });
 }
 
 // ----------------------------------------------------

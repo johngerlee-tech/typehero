@@ -47,6 +47,11 @@
 
       <!-- 右側工具列與按鈕 -->
       <div class="header-actions">
+        <!-- 全螢幕切換 (需求 6) -->
+        <button id="btn-fullscreen" class="btn-icon" title="切換全螢幕練習模式 (沉浸式打字)">
+          <span id="fullscreen-icon">⛶</span>
+        </button>
+
         <!-- 音效切換 -->
         <button id="toggle-sound" class="btn-icon" title="切換按鍵音效">
           <span id="sound-icon">🔊</span>
@@ -97,59 +102,6 @@
       </div>
     </div>
 
-    <!-- 打字即時儀表板 (Stats Dashboard) -->
-    <div class="stats-dashboard">
-      <!-- 當前關卡 -->
-      <div class="stat-box">
-        <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
-          <span>🎯</span>
-        </div>
-        <div class="stat-content">
-          <span class="stat-title">當前挑戰關卡</span>
-          <span id="stat-lesson-title" class="stat-val" style="font-size:1.05rem;">1. 食指初探</span>
-        </div>
-      </div>
-
-      <!-- 即時打字速度 WPM -->
-      <div class="stat-box">
-        <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
-          <span>⚡</span>
-        </div>
-        <div class="stat-content">
-          <span class="stat-title">打字速度 (每分鐘字數 WPM)</span>
-          <div style="display:flex; align-items:baseline; gap:4px;">
-            <span id="stat-wpm" class="stat-val">0</span>
-            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:bold;">字/分</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 準確率 -->
-      <div class="stat-box">
-        <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-          <span>🎯</span>
-        </div>
-        <div class="stat-content">
-          <span class="stat-title">擊鍵準確率</span>
-          <span id="stat-accuracy" class="stat-val">100%</span>
-        </div>
-      </div>
-
-      <!-- 關卡進度條與連擊 -->
-      <div class="stat-box" style="flex-direction: column; justify-content: center; gap: 0.4rem;">
-        <div style="display: flex; justify-content: space-between; width: 100%; font-size: 0.75rem; font-weight: bold;">
-          <span style="color: var(--text-muted);">關卡完成進度</span>
-          <span id="stat-progress-text" style="color: var(--brand-primary);">0%</span>
-        </div>
-        <div style="background: var(--bg-secondary); height: 8px; border-radius: 9999px; overflow: hidden; width: 100%;">
-          <div id="stat-progress-bar" style="background: linear-gradient(90deg, var(--brand-primary), #6366f1); height: 100%; width: 0%; border-radius: 9999px; transition: width 0.15s ease;"></div>
-        </div>
-
-        <!-- 連擊動態徽章 -->
-        <div class="combo-badge-wrapper" id="combo-badge-wrapper"></div>
-      </div>
-    </div>
-
     <!-- 核心打字舞台 (Typing Arena) -->
     <div class="typing-arena" id="typing-arena">
       <!-- 隱藏式真實輸入框 (使微軟注音等所有中文輸入法能正常呼叫與組字) -->
@@ -176,6 +128,11 @@
         <span id="ime-preview-text" class="ime-preview-text"></span>
       </div>
 
+      <!-- 智慧防呆提示泡泡 (需求 5: 中文關卡誤按英文時即時提醒) -->
+      <div id="ime-smart-alert" class="ime-smart-alert hidden">
+        <span>💡 貼心提醒：目前是中文字詞關卡，請按鍵盤上的 <strong>Shift</strong> 鍵切換成微軟注音輸入法喔！</span>
+      </div>
+
       <!-- 點擊開始打字遮罩 (Focus Guard) -->
       <div id="focus-alert" class="focus-guard">
         <div class="focus-card">
@@ -186,8 +143,74 @@
       </div>
     </div>
 
-    <!-- 雙語虛擬鍵盤與全覆蓋半透明指法引導層 (Bilingual Keyboard with Transparent Hands Overlay) -->
-    <div class="guide-layout">
+    <!-- 鍵盤與側邊動態儀表板並列佈局 (需求 3: 避免縱向版面過長，與鍵盤並列一覽無遺) -->
+    <div class="keyboard-stage-wrapper">
+      <!-- 左側直列儀表板 (Stats Sidebar) -->
+      <aside class="stats-sidebar" id="stats-sidebar">
+        <!-- 當前關卡 -->
+        <div class="stat-box">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+            <span>🎯</span>
+          </div>
+          <div class="stat-content">
+            <span class="stat-title">當前挑戰關卡</span>
+            <span id="stat-lesson-title" class="stat-val" style="font-size:0.95rem;">1. 食指初探</span>
+          </div>
+        </div>
+
+        <!-- 即時打字速度 WPM -->
+        <div class="stat-box">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+            <span>⚡</span>
+          </div>
+          <div class="stat-content">
+            <span class="stat-title">打字速度</span>
+            <div style="display:flex; align-items:baseline; gap:4px;">
+              <span id="stat-wpm" class="stat-val">0</span>
+              <span style="font-size:0.75rem; color:var(--text-muted); font-weight:bold;">字/分</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 輸入準確率 (由 擊鍵準確率 改名) -->
+        <div class="stat-box">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+            <span>🎯</span>
+          </div>
+          <div class="stat-content">
+            <span class="stat-title">輸入準確率</span>
+            <span id="stat-accuracy" class="stat-val">100%</span>
+          </div>
+        </div>
+
+        <!-- 關卡進度條與連擊 -->
+        <div class="stat-box" style="flex-direction: column; justify-content: center; gap: 0.35rem;">
+          <div style="display: flex; justify-content: space-between; width: 100%; font-size: 0.72rem; font-weight: bold;">
+            <span style="color: var(--text-muted);">關卡完成進度</span>
+            <span id="stat-progress-text" style="color: var(--brand-primary);">0%</span>
+          </div>
+          <div style="background: var(--bg-secondary); height: 7px; border-radius: 9999px; overflow: hidden; width: 100%;">
+            <div id="stat-progress-bar" style="background: linear-gradient(90deg, var(--brand-primary), #6366f1); height: 100%; width: 0%; border-radius: 9999px; transition: width 0.15s ease;"></div>
+          </div>
+          <div class="combo-badge-wrapper" id="combo-badge-wrapper"></div>
+        </div>
+
+        <!-- 智慧輸入法指引卡片 (需求 5: 醒目提示當前輸入法狀態) -->
+        <div class="stat-box ime-guide-box" id="ime-guide-box">
+          <div class="stat-icon" id="ime-guide-icon-bg" style="background: linear-gradient(135deg, #38bdf8, #0284c7);">
+            <span id="ime-guide-icon">🔤</span>
+          </div>
+          <div class="stat-content">
+            <span class="stat-title" style="color:var(--brand-primary); font-weight:800;">輸入法模式</span>
+            <span id="ime-guide-mode-text" style="font-size: 0.8rem; font-weight: 700; color: var(--text-main);">英數 / 實體盲打</span>
+            <span id="ime-guide-hint-text" style="font-size: 0.68rem; color: var(--text-muted); line-height:1.25; margin-top:2px;">
+              敲擊實體按鍵即可盲打
+            </span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 右側虛擬鍵盤與擬真人體工學手指引導層 -->
       <div class="keyboard-box">
         <!-- 鍵盤頂部指法動態引導 HUD 與透明度調節列 -->
         <div class="keyboard-top-toolbar">
@@ -220,22 +243,40 @@
           <div id="hands-overlay-wrapper" class="hands-overlay-wrapper">
             <svg id="hands-overlay-svg" class="hands-overlay-svg" xmlns="http://www.w3.org/2000/svg">
               <defs>
-                <!-- 柔和膚色漸層 (通透半透明，可清晰透視底層鍵盤英數與注音) -->
+                <!-- 擬真人體工學手掌膚色漸層 (微透光、溫潤柔和膚色) -->
                 <linearGradient id="skin-gradient-palm" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#fed7aa" stop-opacity="0.65" />
-                  <stop offset="100%" stop-color="#fdba74" stop-opacity="0.58" />
+                  <stop offset="0%" stop-color="#fcd8be" stop-opacity="0.80" />
+                  <stop offset="60%" stop-color="#f8be9e" stop-opacity="0.72" />
+                  <stop offset="100%" stop-color="#ee9b75" stop-opacity="0.65" />
                 </linearGradient>
+
+                <!-- 擬真十指膚色漸層 (指背至指節漸層，立體飽滿指腹) -->
                 <linearGradient id="skin-gradient-finger" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#ffedd5" stop-opacity="0.70" />
-                  <stop offset="60%" stop-color="#fed7aa" stop-opacity="0.62" />
-                  <stop offset="100%" stop-color="#fdba74" stop-opacity="0.55" />
+                  <stop offset="0%" stop-color="#ffebd9" stop-opacity="0.88" />
+                  <stop offset="30%" stop-color="#fcd8be" stop-opacity="0.82" />
+                  <stop offset="75%" stop-color="#f7b795" stop-opacity="0.75" />
+                  <stop offset="100%" stop-color="#eb926b" stop-opacity="0.68" />
                 </linearGradient>
-                <!-- 擊鍵目標手指高亮微紅發光漸層 -->
+
+                <!-- 擊鍵中目標手指高亮微赤發光漸層 (擬真人手微血管充血與電競流光) -->
                 <linearGradient id="skin-gradient-active" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#fecdd3" stop-opacity="0.85" />
-                  <stop offset="70%" stop-color="#f87171" stop-opacity="0.75" />
-                  <stop offset="100%" stop-color="#ef4444" stop-opacity="0.70" />
+                  <stop offset="0%" stop-color="#ffe4e6" stop-opacity="0.95" />
+                  <stop offset="40%" stop-color="#fda4af" stop-opacity="0.90" />
+                  <stop offset="85%" stop-color="#f43f5e" stop-opacity="0.85" />
+                  <stop offset="100%" stop-color="#e11d48" stop-opacity="0.80" />
                 </linearGradient>
+
+                <!-- 指甲甲面微光漸層 (Fingernail with natural luster) -->
+                <linearGradient id="skin-gradient-nail" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85" />
+                  <stop offset="45%" stop-color="#fff1f2" stop-opacity="0.65" />
+                  <stop offset="100%" stop-color="#fecdd3" stop-opacity="0.45" />
+                </linearGradient>
+
+                <!-- 擬真手指立體投影濾鏡 (下壓敲鍵立體感) -->
+                <filter id="skin-finger-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="rgba(40, 20, 15, 0.35)" />
+                </filter>
               </defs>
               <g id="hands-layer-palms"></g>
               <g id="hands-layer-fingers"></g>
@@ -402,7 +443,11 @@
       <div class="modal-rainbow-bar"></div>
       <div class="modal-content" style="align-items: stretch; text-align: left; padding: 2rem 2.2rem;">
         <div style="text-align: center; margin-bottom: 1.25rem;">
-          <div class="login-welcome-icon">🎒</div>
+          <!-- 需求 0: 換成跟打字練功有連結的動態修煉圖案 -->
+          <div class="login-welcome-icon animated-hero-icon" title="打字練功修煉學院">
+            <span class="hero-glyph">⌨️</span>
+            <span class="hero-sparkle">⚡</span>
+          </div>
           <h2 style="font-size: 1.45rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.35rem;">
             溪洲國小打字冒險學院
           </h2>
@@ -411,7 +456,7 @@
           </p>
         </div>
 
-        <form id="form-student-login" onsubmit="return false;" style="display:flex; flex-direction:column; gap:0.95rem;">
+        <form id="form-student-login" onsubmit="return false;" style="display:flex; flex-direction:column; gap:0.85rem;">
           <div>
             <label for="login-class-select" style="font-size:0.85rem; font-weight:bold; display:flex; align-items:center; gap:0.4rem; margin-bottom:0.35rem;">
               <span>🏫 選擇所屬班級</span>
@@ -430,13 +475,31 @@
             </div>
             <div>
               <label for="login-name-input" style="font-size:0.85rem; font-weight:bold; display:flex; align-items:center; gap:0.4rem; margin-bottom:0.35rem;">
-                <span>👤 姓名或暱稱</span>
+                <span>👤 我的暱稱</span>
               </label>
-              <input type="text" id="login-name-input" class="form-input" placeholder="例如：王小明 或 神速小杰" maxlength="12" required>
+              <!-- 需求 1: 預設為空白，有一行提示文字「請設定您的暱稱」，打字時隱形 -->
+              <input type="text" id="login-name-input" class="form-input" placeholder="請設定您的暱稱" maxlength="12" required>
             </div>
           </div>
 
-          <button type="submit" id="login-submit-btn" class="btn-primary" style="margin-top:0.6rem; padding:0.85rem; font-size:1.05rem; font-weight:800; justify-content:center; box-shadow:0 6px 20px var(--brand-glow);">
+          <!-- 需求 2: 學生登入唯一密碼 (防冒用) -->
+          <div>
+            <label for="login-password-input" style="font-size:0.85rem; font-weight:bold; display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="display:flex; align-items:center; gap:0.4rem;">🔑 學生通行密碼 (防冒用)</span>
+              <span style="font-size:0.72rem; color:var(--text-muted); font-weight:normal;">首次輸入即自動綁定</span>
+            </label>
+            <input type="password" id="login-password-input" class="form-input" placeholder="請設定 4 位數或自訂密碼" maxlength="20" required autocomplete="current-password">
+            <span style="font-size:0.72rem; color:var(--text-muted); display:block; margin-top:0.25rem;">
+              💡 換電腦時需輸入此密碼還原紀錄；忘記密碼請洽任課老師於後臺查看或重設。
+            </span>
+          </div>
+
+          <!-- 密碼錯誤提示框 -->
+          <div id="login-password-error" style="color:#ef4444; font-size:0.78rem; font-weight:bold; display:none; padding:0.45rem 0.75rem; background:rgba(239,68,68,0.12); border-radius:6px; border:1px solid rgba(239,68,68,0.35); line-height:1.4;">
+            ❌ 密碼錯誤！該座號已有專屬密碼。<br>若忘記密碼，請洽任課老師至「教師後臺」查看或重設！
+          </div>
+
+          <button type="submit" id="login-submit-btn" class="btn-primary" style="margin-top:0.4rem; padding:0.85rem; font-size:1.05rem; font-weight:800; justify-content:center; box-shadow:0 6px 20px var(--brand-glow);">
             🚀 登載完成，進入打字學院！
           </button>
         </form>
@@ -523,6 +586,31 @@
               <button id="admin-btn-save-batch" class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.85rem;">
                 💾 儲存批次清單
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 需求 2: 學生帳號與通行密碼管理區 (供管理者查看與變更) -->
+        <div class="admin-section-box" style="margin-top: 1rem; border: 1px solid rgba(129, 140, 248, 0.35); background: rgba(99, 102, 241, 0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+            <label style="font-size:0.85rem; font-weight:bold; display:flex; align-items:center; gap:0.4rem; color:var(--brand-primary);">
+              <span>👥 全校學生帳號與密碼管理 (防止冒用/重設密碼)</span>
+            </label>
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+              <select id="admin-student-class-filter" class="form-select" style="font-size:0.75rem; padding:0.25rem 0.5rem; width:auto;">
+                <!-- 班級篩選下拉 -->
+              </select>
+              <button id="admin-btn-refresh-students" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.6rem;">
+                🔄 重新整理
+              </button>
+            </div>
+          </div>
+          <div style="font-size:0.74rem; color:var(--text-muted); margin-bottom:0.5rem;">
+            若學生忘記密碼，老師可在此查看或直接點擊「修改」重設密碼：
+          </div>
+          <div id="admin-students-table-container" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-card);">
+            <div style="text-align:center; padding:1.2rem; font-size:0.78rem; color:var(--text-muted);">
+              正在自 Firebase 雲端讀取學生帳號名冊...
             </div>
           </div>
         </div>
