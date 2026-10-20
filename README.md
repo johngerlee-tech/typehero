@@ -61,8 +61,20 @@
 
 ## ☁️ 連接 Firebase 雲端資料庫教學
 
-若欲啟用跨電腦全校即時排行榜，可免費建立 Firebase 專案：
+若欲啟用跨電腦全校即時排行榜與學生進度漫遊，可使用 Firebase 免費服務：
 1. 前往 [Firebase Console](https://console.firebase.google.com/) 並新增專案。
-2. 在「建構」中開啟 **Cloud Firestore**，並建立資料庫（測試模式啟動）。
-3. 在專案設定中新增「網路應用程式 (Web App)」，複製其中的 `firebaseConfig` 物件。
-4. 在 `js/firebase-config.js` 中填入您的設定，或直接在遊戲網頁中設定，全校學生即可享有即時成績雲端漫遊！
+2. 在「建構 (Build)」中開啟 **Firestore Database**，並建立資料庫。
+3. **重要：設定安全性規則 (Security Rules)**
+   * 進入 Firestore 的「**規則 (Rules)**」標籤頁，將規則修改為允許讀寫並點選「發布」：
+     ```javascript
+     rules_version = '2';
+     service cloud.firestore {
+       match /databases/{database}/documents {
+         match /{document=**} {
+           allow read, write: if true;
+         }
+       }
+     }
+     ```
+4. 在專案設定中新增「網路應用程式 (Web App)」，複製其中的 `firebaseConfig` 物件，填入 `js/firebase-config.js` 的 `DEFAULT_FIREBASE_CONFIG` 中。
+5. 完成後將網頁推送至 GitHub Pages 或校內伺服器，全校所有電腦開啟網頁時即自動連線，學生輸入班級與座號即可在全校任一電腦享受成績與造型**「雙向即時雲端漫遊」**！

@@ -70,8 +70,68 @@ class ShopManager {
     };
   }
 
-  saveData() {
+  saveData(syncCloud = true) {
     localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+    this.updateUI();
+
+    // 雲端資料庫雙向同步
+    if (syncCloud && window.cloudSync && window.cloudSync.isFirebaseReady) {
+      window.cloudSync.syncProfileToCloud();
+    }
+  }
+
+  /**
+   * 自雲端漫遊還原學生進度（換電腦登入時觸發）
+   */
+  restoreFromCloud(cloudData) {
+    if (!cloudData) return;
+
+    // 1. 金幣與經驗值（合併雲端紀錄，取較優值）
+    const cloudCoins = Number(cloudData.coins);
+    if (!isNaN(cloudCoins)) {
+      this.data.coins = Math.max(this.data.coins || 0, cloudCoins);
+    }
+
+    const cloudExp = Number(cloudData.exp);
+    if (!isNaN(cloudExp)) {
+      this.data.exp = Math.max(this.data.exp || 0, cloudExp);
+      this.data.level = Math.floor(this.data.exp / 200) + 1;
+    }
+
+    // 2. 關卡星等 (合併本地與雲端，保留最高星數)
+    const localStars = this.data.lessonStars || {};
+    const cloudStars = cloudData.lessonStars || {};
+    const mergedStars = { ...localStars };
+    for (const [id, stars] of Object.entries(cloudStars)) {
+      mergedStars[id] = Math.max(mergedStars[id] || 0, Number(stars) || 0);
+    }
+    this.data.lessonStars = mergedStars;
+
+    // 3. 背包解鎖清單 (聯集不重複)
+    const mergeArrays = (arr1, arr2) => Array.from(new Set([...(arr1 || []), ...(arr2 || [])]));
+    this.data.unlockedSkins = mergeArrays(this.data.unlockedSkins, cloudData.unlockedSkins);
+    this.data.unlockedSounds = mergeArrays(this.data.unlockedSounds, cloudData.unlockedSounds);
+    this.data.unlockedAvatars = mergeArrays(this.data.unlockedAvatars, cloudData.unlockedAvatars);
+
+    // 4. 裝備狀態 (以雲端紀錄為主)
+    if (cloudData.equippedSkin && this.data.unlockedSkins.includes(cloudData.equippedSkin)) {
+      this.data.equippedSkin = cloudData.equippedSkin;
+    }
+    if (cloudData.equippedSound && this.data.unlockedSounds.includes(cloudData.equippedSound)) {
+      this.data.equippedSound = cloudData.equippedSound;
+    }
+    if (cloudData.equippedAvatar && this.data.unlockedAvatars.includes(cloudData.equippedAvatar)) {
+      this.data.equippedAvatar = cloudData.equippedAvatar;
+    }
+
+    // 寫入本機快取（不重複上傳避免無窮迴圈）
+    this.saveData(false);
+
+    // 套用外觀、音效與畫面
+    this.applySkin(this.data.equippedSkin);
+    if (window.soundEngine) {
+      window.soundEngine.setSoundPack(this.data.equippedSound);
+    }
     this.updateUI();
   }
 

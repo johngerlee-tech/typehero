@@ -132,6 +132,24 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.cloudSync) {
     window.cloudSync.populateClassSelects();
     window.cloudSync.updateProfileBadgeUI();
+
+    // 背景自雲端還原（若本機已有註冊學生身分）
+    const curP = window.cloudSync.profile;
+    if (curP && curP.hasRegistered && curP.className && curP.seatNumber) {
+      window.cloudSync.loadProfileFromCloud(curP.className, curP.seatNumber).then(cloudData => {
+        if (cloudData && gameState.currentCategory && window.COURSES) {
+          renderLessonsGrid(window.COURSES[gameState.currentCategory]);
+        }
+      });
+    }
+  }
+
+  // 頂部導航列雲端狀態徽章點擊
+  const cloudPill = document.getElementById('cloud-status-pill');
+  if (cloudPill) {
+    cloudPill.onclick = () => {
+      if (window.openAdminAuthModal) window.openAdminAuthModal();
+    };
   }
 
   // 載入首頁先跳出學生班級、座號與姓名登載彈窗
@@ -1331,11 +1349,17 @@ function initModals() {
     profileModal.classList.add('active');
   };
   document.getElementById('close-profile-btn').onclick = () => profileModal.classList.remove('active');
-  document.getElementById('save-profile-btn').onclick = () => {
+  document.getElementById('save-profile-btn').onclick = async () => {
     const c = document.getElementById('input-class-name').value.trim() || '5年3班';
     const s = document.getElementById('input-seat-num').value.trim() || '01';
     const n = document.getElementById('input-nickname').value.trim() || '鍵盤小英雄';
-    if (window.cloudSync) window.cloudSync.saveProfile(c, s, n);
+    if (window.cloudSync) {
+      window.cloudSync.saveProfile(c, s, n);
+      const cloudData = await window.cloudSync.loadProfileFromCloud(c, s);
+      if (cloudData && gameState.currentCategory && window.COURSES) {
+        renderLessonsGrid(window.COURSES[gameState.currentCategory]);
+      }
+    }
     if (window.shopManager) window.shopManager.updateUI();
     profileModal.classList.remove('active');
     alert('✅ 個人檔案與班級設定已更新！');
@@ -1349,7 +1373,7 @@ function initModals() {
   const loginNameInp = document.getElementById('login-name-input');
 
   if (loginForm) {
-    loginForm.onsubmit = (e) => {
+    loginForm.onsubmit = async (e) => {
       e.preventDefault();
       const selClass = loginClassSel ? loginClassSel.value : '5年3班';
       const seatVal = loginSeatInp ? loginSeatInp.value.trim() : '';
@@ -1368,6 +1392,20 @@ function initModals() {
 
       if (window.cloudSync) {
         window.cloudSync.saveProfile(selClass, seatVal, nameVal);
+
+        // 核心：自雲端漫遊還原此座號在全校其他電腦累積的等級、星幣、外觀與星星！
+        const cloudData = await window.cloudSync.loadProfileFromCloud(selClass, seatVal);
+        if (cloudData) {
+          // 若有輸入新暱稱，同步更新到雲端
+          if (nameVal && nameVal !== cloudData.nickname) {
+            window.cloudSync.profile.nickname = nameVal;
+            window.cloudSync.syncProfileToCloud();
+          }
+          // 重新整理關卡地圖卡片的解鎖狀態（根據雲端星星解鎖關卡）
+          if (gameState.currentCategory && window.COURSES) {
+            renderLessonsGrid(window.COURSES[gameState.currentCategory]);
+          }
+        }
       }
       if (window.shopManager) {
         window.shopManager.updateUI();
@@ -1428,6 +1466,9 @@ function initModals() {
         if (currentPwdHint && window.cloudSync) {
           currentPwdHint.innerText = window.cloudSync.getAdminPassword();
         }
+
+        // 自動執行一次 Firebase 即時連線診斷
+        runFirebaseDiagnostic();
       } else {
         if (authErrorEl) authErrorEl.style.display = 'block';
         if (authPasswordInp) {
@@ -1590,6 +1631,47 @@ function initModals() {
         alert('✅ 本機排行榜紀錄已成功清空！');
       }
     };
+  }
+
+  // 後臺：Firebase 雲端連線測試按鈕
+  const testFirebaseBtn = document.getElementById('admin-btn-test-firebase');
+  if (testFirebaseBtn) {
+    testFirebaseBtn.onclick = runFirebaseDiagnostic;
+  }
+}
+
+/**
+ * 執行 Firebase 連線診斷並渲染至後臺狀態框
+ */
+async function runFirebaseDiagnostic() {
+  const statusBox = document.getElementById('admin-firebase-status-box');
+  if (!statusBox) return;
+
+  statusBox.innerHTML = '<span style="color:var(--brand-primary); font-weight:bold;">🔄 正在連線至 Firebase 測試伺服器...</span>';
+  if (!window.cloudSync) {
+    statusBox.innerHTML = '<span style="color:#ef4444; font-weight:bold;">❌ 雲端同步模組未載入</span>';
+    return;
+  }
+
+  const res = await window.cloudSync.testConnection();
+  if (res.success) {
+    statusBox.innerHTML = `
+      <div style="color:#10b981; font-weight:bold; margin-bottom:0.25rem;">
+        ✅ ${res.message}
+      </div>
+      <div style="color:var(--text-muted); font-size:0.75rem;">
+        全校即時排行榜已連線 · 學生跨電腦漫遊已啟動 · 班級設定已同步！
+      </div>
+    `;
+  } else {
+    statusBox.innerHTML = `
+      <div style="color:#ef4444; font-weight:bold; margin-bottom:0.25rem;">
+        ❌ 連線異常 (${res.code || '連線受阻'})
+      </div>
+      <div style="color:#f87171; font-size:0.75rem; line-height:1.4;">
+        ${res.reason}
+      </div>
+    `;
   }
 }
 

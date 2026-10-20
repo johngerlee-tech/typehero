@@ -38,6 +38,11 @@
           <span id="user-coins-display">100</span>
           <span style="font-size: 0.7rem;">幣</span>
         </div>
+
+        <div class="stat-pill pill-cloud" id="cloud-status-pill" title="Firebase 雲端連線狀態 (點擊可開啟教師後臺檢視診斷)" style="cursor: pointer;">
+          <span id="cloud-status-icon">☁️</span>
+          <span id="cloud-status-text">連線中...</span>
+        </div>
       </div>
 
       <!-- 右側工具列與按鈕 -->
@@ -461,6 +466,21 @@
         <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:1.1rem;">
           教師可在此自訂前臺「班級下拉選單」的參數與選項，更新後學生端與首頁將立即套用。
         </p>
+
+        <!-- 雲端資料庫狀態與連線診斷 -->
+        <div class="admin-section-box" style="margin-bottom: 1rem; border: 1px solid rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.06);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem;">
+            <label style="font-size:0.85rem; font-weight:bold; display:flex; align-items:center; gap:0.4rem; color:var(--brand-primary);">
+              <span>☁️ Firebase 雲端資料庫即時診斷</span>
+            </label>
+            <button id="admin-btn-test-firebase" class="btn-primary" style="font-size:0.75rem; padding:0.35rem 0.8rem;">
+              🔄 立即測試連線
+            </button>
+          </div>
+          <div id="admin-firebase-status-box" style="font-size:0.78rem; line-height:1.5; color:var(--text-muted);">
+            正在檢測雲端資料庫連線...
+          </div>
+        </div>
 
         <!-- 管理區：新增班級與現有班級預覽 -->
         <div class="admin-section-box">
