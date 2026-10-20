@@ -870,19 +870,19 @@ body.in-fullscreen-mode footer {
   gap: 0.35rem;
 }
 
-/* 中文生字詞即時注音聲調拆解 (Proposal III.1.2) */
+/* 中文生字詞即時注音聲調拆解 (Proposal III.1.2 簡易注音免選字) */
 .zhuyin-decompose-badge {
-  background: rgba(245, 158, 11, 0.18);
-  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(245, 158, 11, 0.55);
   color: #fbbf24;
-  padding: 0.15rem 0.55rem;
+  padding: 0.18rem 0.65rem;
   border-radius: var(--radius-full);
   font-size: 0.74rem;
   font-weight: 800;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  letter-spacing: 1px;
+  gap: 0.35rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .zhuyin-decompose-badge.hidden {
@@ -897,8 +897,41 @@ body.in-fullscreen-mode footer {
 
 .zhuyin-decompose-text {
   color: #fde047;
-  font-size: 0.86rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.zh-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0.08rem 0.38rem;
+  border-radius: 4px;
+  font-size: 0.76rem;
+  transition: all 0.15s ease;
+}
+
+.zh-part.zh-done {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.18);
+  font-weight: 700;
+}
+
+.zh-part.zh-active {
+  color: #ffffff;
+  background: #f59e0b;
+  border: 1px solid #fbbf24;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
   font-weight: 900;
+  transform: scale(1.06);
+}
+
+.zh-part.zh-pending {
+  color: var(--text-muted);
+  opacity: 0.6;
 }
 
 /* 語音朗讀按鈕 (Proposal III.3.3) */

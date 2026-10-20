@@ -104,6 +104,7 @@ let gameState = {
   currentCategory: 'zhuyin', // 'zhuyin' | 'chinese' | 'english'
   currentLesson: null,
   currentIndex: 0,
+  subCharIndex: 0, // 簡易注音音節子按鍵進度 (0, 1, 2, 3...)
   correctCount: 0,
   totalKeyStrokes: 0,
   comboCount: 0,
@@ -302,17 +303,16 @@ function initInputListeners() {
       return;
     }
 
-    // 需求 5: 中文生字詞關卡若以英文狀態直接敲出字母，跳出防呆提醒切換 Shift
-    if (gameState.currentCategory === 'chinese' && !gameState.isComposing && /^[a-zA-Z]$/.test(e.key)) {
-      showImeSmartAlert();
-    }
-
     if (e.key === 'Tab') {
       e.preventDefault();
       return;
     }
 
     if (e.key === 'Backspace') {
+      if (gameState.subCharIndex > 0) {
+        gameState.subCharIndex--;
+        highlightTarget();
+      }
       if (window.soundEngine) window.soundEngine.playKey('special', gameState.comboCount);
       return;
     }
@@ -376,43 +376,106 @@ function showImeSmartAlert() {
 }
 
 // ----------------------------------------------------
-// 3. 字元匹配比對核心 (支援全形標點相容與注音鍵對應)
+// 3. 簡易注音音節拆解與鍵位映射核心 (免選字、免切換輸入法)
 // ----------------------------------------------------
-function isCharMatch(typed, expected) {
-  if (typed === expected) return true;
+function getCharSubKeys(char) {
+  if (!char) return [];
 
-  // 1. 全形/半形常用標點相容處理
+  // 1. 標點符號 (支援英數狀態直接敲擊實體鍵)
   const puncMap = {
-    ',': '，', '，': ',',
-    '.': '。', '。': '.',
-    '!': '！', '！': '!',
-    '?': '？', '？': '?',
-    ';': '；', '；': ';',
-    ':': '：', '：': ':',
-    '\'': '、', '、': '\'',
-    '[': '「', '「': '[',
-    ']': '」', '」': ']'
+    '，': { key: ',', label: '， (,)', hint: '逗號' },
+    '。': { key: '.', label: '。 (.)', hint: '句號' },
+    '！': { key: '!', altKey: '1', label: '！ (Shift+1 或 1)', hint: '驚嘆號' },
+    '？': { key: '?', altKey: '/', label: '？ (Shift+/ 或 /)', hint: '問號' },
+    '：': { key: ':', altKey: ';', label: '： (Shift+;)', hint: '冒號' },
+    '；': { key: ';', label: '； (;)', hint: '分號' },
+    '、': { key: "'", label: "、 (')", hint: '頓號' },
+    '「': { key: '[', label: '「 ([)', hint: '左引號' },
+    '」': { key: ']', label: '」 (])', hint: '右引號' },
+    ',': { key: ',', label: ',' },
+    '.': { key: '.', label: '.' },
+    '!': { key: '!', altKey: '1', label: '!' },
+    '?': { key: '?', altKey: '/', label: '?' },
+    ':': { key: ':', altKey: ';', label: ':' },
+    ';': { key: ';', label: ';' },
+    "'": { key: "'", label: "'" },
+    '[': { key: '[', label: '[' },
+    ']': { key: ']', label: ']' }
   };
-  if (puncMap[typed] === expected || puncMap[expected] === typed) {
-    return true;
+  if (puncMap[char]) return [puncMap[char]];
+
+  // 2. 空白鍵
+  if (char === ' ') {
+    return [{ key: ' ', label: '空白鍵 (Space)', isSpace: true }];
   }
 
-  // 2. 注音符號實體鍵位映射 (例如在注音盲打關卡，敲擊實體鍵 '1' 等同 'ㄅ')
-  if (window.ZHUYIN_KEY_MAP) {
-    if (window.ZHUYIN_KEY_MAP[expected] === typed.toLowerCase()) return true;
-    if (window.ZHUYIN_KEY_MAP[typed] === expected) return true;
+  // 3. 注音符號盲打 (ZHUYIN_COURSE 中的單一注音或聲調)
+  if (window.ZHUYIN_KEY_MAP && window.ZHUYIN_KEY_MAP[char]) {
+    const pk = window.ZHUYIN_KEY_MAP[char];
+    const isTone = (char === 'ˊ' || char === 'ˇ' || char === 'ˋ' || char === '˙');
+    const toneName = char === 'ˊ' ? '二聲' : char === 'ˇ' ? '三聲' : char === 'ˋ' ? '四聲' : char === '˙' ? '輕聲' : '';
+    return [{ key: pk, label: `${char} (${pk.toUpperCase()}) ${toneName}`.trim(), zh: char, isTone }];
   }
 
-  // 3. 英文字母大小寫相容
-  if (typed.toLowerCase() === expected.toLowerCase() && expected.length === 1 && expected >= 'a' && expected <= 'z') {
-    return true;
+  // 4. 英文字母或數字
+  if (/^[a-zA-Z0-9]$/.test(char)) {
+    return [{ key: char.toLowerCase(), label: char.toUpperCase() }];
   }
+
+  // 5. 中文字詞：免選字音節拆解 (依據 ZHUYIN_CHAR_MAP 拆為大千注音鍵位)
+  if (window.ZHUYIN_CHAR_MAP && window.ZHUYIN_CHAR_MAP[char]) {
+    const zhStr = window.ZHUYIN_CHAR_MAP[char];
+    const steps = [];
+    let hasTone = false;
+    let lightTone = false;
+
+    for (const z of zhStr) {
+      if (z === '˙') {
+        lightTone = true;
+        hasTone = true;
+      } else if (z === 'ˊ' || z === 'ˇ' || z === 'ˋ') {
+        hasTone = true;
+        const k = window.ZHUYIN_KEY_MAP ? window.ZHUYIN_KEY_MAP[z] : null;
+        const toneName = z === 'ˊ' ? '二聲' : z === 'ˇ' ? '三聲' : '四聲';
+        if (k) steps.push({ key: k, label: `${z} (${k}) ${toneName}`, zh: z, isTone: true });
+      } else {
+        const k = window.ZHUYIN_KEY_MAP ? window.ZHUYIN_KEY_MAP[z] : null;
+        if (k) steps.push({ key: k, label: `${z} (${k.toUpperCase()})`, zh: z });
+      }
+    }
+
+    if (lightTone) {
+      steps.push({ key: '7', label: '˙ (7) 輕聲', zh: '˙', isTone: true });
+    } else if (!hasTone) {
+      // 一聲以空白鍵完成
+      steps.push({ key: ' ', label: '一聲 (Space)', zh: ' ', isTone: true, isSpace: true });
+    }
+
+    return steps;
+  }
+
+  return [{ key: char, label: char }];
+}
+
+function isSubKeyMatch(typed, step) {
+  if (!step) return false;
+  const t = typed.toLowerCase();
+  const k = step.key.toLowerCase();
+  if (t === k) return true;
+  if (step.altKey && t === step.altKey.toLowerCase()) return true;
+
+  // 常用符號直接敲擊容錯
+  if (k === '!' && (t === '1' || t === '!')) return true;
+  if (k === '?' && (t === '/' || t === '?')) return true;
+  if (k === ':' && (t === ';' || t === ':')) return true;
+  if (k === '，' && t === ',') return true;
+  if (k === '。' && t === '.') return true;
 
   return false;
 }
 
 // ----------------------------------------------------
-// 4. 輸入字元推進與正誤判定 (嚴格準確率計數)
+// 4. 輸入字元推進與正誤判定 (簡易注音免選字核心)
 // ----------------------------------------------------
 function processCommittedText(text) {
   if (!text || !gameState.currentLesson) return;
@@ -431,58 +494,139 @@ function processCommittedText(text) {
 
     const typedChar = text[i];
     const expectedChar = targetText[gameState.currentIndex];
+    const subKeys = getCharSubKeys(expectedChar);
+    if (subKeys.length === 0) {
+      gameState.currentIndex++;
+      continue;
+    }
 
-    // 每次有效按鍵敲擊，計數器確實累加
+    const currentStep = subKeys[gameState.subCharIndex] || subKeys[0];
+
+    // 每次有效按鍵敲擊，計數器累加
     gameState.totalKeyStrokes++;
 
-    const isCorrect = isCharMatch(typedChar, expectedChar);
-
-    if (isCorrect) {
-      streamSpans[gameState.currentIndex].className = 'char-correct';
+    // 1. 若整字完全一致 (例如直接貼上或輸入法直接送出中文「老」)
+    if (typedChar === expectedChar) {
       gameState.correctCount++;
       gameState.comboCount++;
-      if (gameState.comboCount > gameState.comboMax) {
-        gameState.comboMax = gameState.comboCount;
-      }
+      if (gameState.comboCount > gameState.comboMax) gameState.comboMax = gameState.comboCount;
+      updateComboUI(gameState.comboCount);
+      if (typeof updateMascot === 'function') updateMascot('combo', gameState.comboCount);
 
-      // 伴學精靈連擊打氣 (Proposal IV.2)
-      if (typeof updateMascot === 'function') {
-        updateMascot('combo', gameState.comboCount);
-      }
-
-      // 手指動態敲擊下壓反饋
       const activeTargetEl = document.querySelector('.key-target');
       const activeFinger = activeTargetEl ? activeTargetEl.dataset.finger : null;
-      if (window.handsOverlay) {
-        window.handsOverlay.onKeyPress(activeFinger);
-      }
-
+      if (window.handsOverlay) window.handsOverlay.onKeyPress(activeFinger);
       if (expectedChar === ' ') {
         if (window.soundEngine) window.soundEngine.playKey('space', gameState.comboCount);
       } else {
         if (window.soundEngine) window.soundEngine.playKey('std', gameState.comboCount);
       }
-    } else {
-      // 標註為錯誤，打錯不卡關，游標依舊向前
-      streamSpans[gameState.currentIndex].className = 'char-wrong';
-      gameState.comboCount = 0; // 中斷連擊
-      if (typeof updateMascot === 'function') {
-        updateMascot('wrong');
+
+      streamSpans[gameState.currentIndex].className = 'char-correct';
+      gameState.currentIndex++;
+      gameState.subCharIndex = 0;
+
+      if (gameState.currentIndex >= targetText.length) {
+        finishLesson();
+        return;
+      } else {
+        streamSpans[gameState.currentIndex].className = 'char-pending char-cursor';
+        highlightTarget();
       }
-      if (window.soundEngine) window.soundEngine.playError();
+      continue;
     }
 
-    updateComboUI(gameState.comboCount);
-    gameState.currentIndex++;
+    // 2. 判斷子鍵位是否匹配
+    const isStepMatched = isSubKeyMatch(typedChar, currentStep);
 
-    if (gameState.currentIndex >= targetText.length) {
-      // 抵達終點，進行結算審查
-      finishLesson();
-      return;
+    if (isStepMatched) {
+      gameState.correctCount++;
+      gameState.subCharIndex++;
+
+      const activeTargetEl = document.querySelector('.key-target');
+      const activeFinger = activeTargetEl ? activeTargetEl.dataset.finger : null;
+      if (window.handsOverlay) window.handsOverlay.onKeyPress(activeFinger);
+
+      // 檢查是否整字完成
+      if (gameState.subCharIndex >= subKeys.length) {
+        // 整字完成！
+        gameState.comboCount++;
+        if (gameState.comboCount > gameState.comboMax) gameState.comboMax = gameState.comboCount;
+        updateComboUI(gameState.comboCount);
+        if (typeof updateMascot === 'function') updateMascot('combo', gameState.comboCount);
+
+        if (currentStep.key === ' ' || expectedChar === ' ') {
+          if (window.soundEngine) window.soundEngine.playKey('space', gameState.comboCount);
+        } else {
+          if (window.soundEngine) window.soundEngine.playKey('std', gameState.comboCount);
+        }
+
+        streamSpans[gameState.currentIndex].className = 'char-correct';
+        gameState.currentIndex++;
+        gameState.subCharIndex = 0;
+
+        if (gameState.currentIndex >= targetText.length) {
+          finishLesson();
+          return;
+        } else {
+          streamSpans[gameState.currentIndex].className = 'char-pending char-cursor';
+          highlightTarget();
+        }
+      } else {
+        // 子鍵位正確，繼續敲擊同一個字的下一個注音！
+        if (currentStep.key === ' ') {
+          if (window.soundEngine) window.soundEngine.playKey('space', gameState.comboCount);
+        } else {
+          if (window.soundEngine) window.soundEngine.playKey('std', gameState.comboCount);
+        }
+        highlightTarget();
+      }
     } else {
-      // 更新下游標與鍵盤/手指引導
-      streamSpans[gameState.currentIndex].className = 'char-pending char-cursor';
-      highlightTarget(targetText[gameState.currentIndex]);
+      // 3. 容錯處理：若當前步驟為一聲空白鍵，而學生直接按下下一個字的起首注音鍵，自動完成前一個字！
+      if (currentStep.key === ' ' && gameState.currentIndex + 1 < targetText.length) {
+        const nextChar = targetText[gameState.currentIndex + 1];
+        const nextSubKeys = getCharSubKeys(nextChar);
+        if (nextSubKeys.length > 0 && isSubKeyMatch(typedChar, nextSubKeys[0])) {
+          streamSpans[gameState.currentIndex].className = 'char-correct';
+          gameState.currentIndex++;
+          gameState.subCharIndex = 1; // 下一個字的第一個鍵已命中！
+          gameState.correctCount += 2;
+          gameState.comboCount++;
+          if (gameState.comboCount > gameState.comboMax) gameState.comboMax = gameState.comboCount;
+          updateComboUI(gameState.comboCount);
+
+          if (window.soundEngine) window.soundEngine.playKey('std', gameState.comboCount);
+
+          if (nextSubKeys.length === 1) {
+            streamSpans[gameState.currentIndex].className = 'char-correct';
+            gameState.currentIndex++;
+            gameState.subCharIndex = 0;
+          }
+
+          if (gameState.currentIndex >= targetText.length) {
+            finishLesson();
+            return;
+          } else {
+            streamSpans[gameState.currentIndex].className = 'char-pending char-cursor';
+            highlightTarget();
+          }
+          continue;
+        }
+      }
+
+      // 4. 輸入錯誤：震動警示與中斷連擊，但不卡關死當，讓學生可立刻按出正確按鍵
+      gameState.comboCount = 0;
+      updateComboUI(0);
+      if (typeof updateMascot === 'function') updateMascot('wrong');
+      if (window.soundEngine) window.soundEngine.playError();
+
+      const curSpan = streamSpans[gameState.currentIndex];
+      if (curSpan) {
+        curSpan.classList.add('char-wrong');
+        setTimeout(() => {
+          if (curSpan.className.includes('char-wrong')) curSpan.classList.remove('char-wrong');
+        }, 350);
+      }
     }
   }
 
@@ -1069,35 +1213,35 @@ function loadCategory(category) {
   const imeHintText = document.getElementById('ime-guide-hint-text');
 
   if (category === 'zhuyin') {
-    badgeEl.innerText = '🇹🇼 台灣大千注音盲打特訓';
+    badgeEl.innerText = '🇹🇼 台灣大千注音符號盲打特訓';
     if (inputEl) {
       inputEl.setAttribute('inputmode', 'latin');
       inputEl.setAttribute('lang', 'en');
     }
     if (imeIcon) imeIcon.innerText = '🔤';
     if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #38bdf8, #0284c7)';
-    if (imeModeText) imeModeText.innerText = '英數 / 盲打實體鍵';
-    if (imeHintText) imeHintText.innerText = '直接敲擊實體按鍵盲打 (請確認切為英文)';
+    if (imeModeText) imeModeText.innerText = '英數 / 簡易注音免選字';
+    if (imeHintText) imeHintText.innerText = '保持英數狀態，直接敲鍵盲打（免切換、免選字）';
   } else if (category === 'chinese') {
-    badgeEl.innerText = '📖 國小生字詞與全形標點選字';
+    badgeEl.innerText = '📖 國小生字詞與常用標點（免選字簡易注音）';
     if (inputEl) {
-      inputEl.setAttribute('inputmode', 'text');
-      inputEl.setAttribute('lang', 'zh-TW');
+      inputEl.setAttribute('inputmode', 'latin');
+      inputEl.setAttribute('lang', 'en');
     }
-    if (imeIcon) imeIcon.innerText = '🇹🇼';
+    if (imeIcon) imeIcon.innerText = '🔤';
     if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
-    if (imeModeText) imeModeText.innerText = '微軟注音 / 中文字詞';
-    if (imeHintText) imeHintText.innerText = '請按 Shift 切為注音，打完注音按空白選字';
+    if (imeModeText) imeModeText.innerText = '英數 / 簡易注音免選字';
+    if (imeHintText) imeHintText.innerText = '依生字注音拆解直接敲鍵，自動完成不需選字換字！';
   } else if (category === 'custom') {
     badgeEl.innerText = '🏫 教師課堂自訂特訓關卡';
     if (inputEl) {
-      inputEl.setAttribute('inputmode', 'text');
-      inputEl.setAttribute('lang', 'zh-TW');
+      inputEl.setAttribute('inputmode', 'latin');
+      inputEl.setAttribute('lang', 'en');
     }
     if (imeIcon) imeIcon.innerText = '🏫';
     if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-    if (imeModeText) imeModeText.innerText = '課堂專屬特訓';
-    if (imeHintText) imeHintText.innerText = '請依老師課堂發布的指定題目內容練習';
+    if (imeModeText) imeModeText.innerText = '英數 / 簡易注音免選字';
+    if (imeHintText) imeHintText.innerText = '保持英數狀態，依指定題目直接敲鍵盲打（免選字）';
   } else {
     badgeEl.innerText = '🔤 國小標準英文盲打挑戰';
     if (inputEl) {
@@ -1106,8 +1250,8 @@ function loadCategory(category) {
     }
     if (imeIcon) imeIcon.innerText = '🔤';
     if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #38bdf8, #0284c7)';
-    if (imeModeText) imeModeText.innerText = '英數 / 盲打實體鍵';
-    if (imeHintText) imeHintText.innerText = '直接敲擊實體按鍵盲打 (請確認切為英文)';
+    if (imeModeText) imeModeText.innerText = '英數 / 英文盲打模式';
+    if (imeHintText) imeHintText.innerText = '保持英數狀態，直接敲擊實體按鍵盲打';
   }
 
   // 繪製關卡地圖卡片 (含鎖定判定)
@@ -1185,6 +1329,7 @@ function selectLesson(lessonId) {
   // 重設狀態
   gameState.currentLesson = target;
   gameState.currentIndex = 0;
+  gameState.subCharIndex = 0;
   gameState.correctCount = 0;
   gameState.totalKeyStrokes = 0;
   gameState.comboCount = 0;
@@ -1354,83 +1499,86 @@ function highlightTarget(char) {
   const hudName = document.getElementById('hud-finger-name');
   const hudIcon = document.getElementById('hud-hand-icon');
   const hudHint = document.getElementById('hud-action-hint');
-
-  // Proposal III.1.2: 常用國小生字詞注音聲調拆解或標點快速指引
   const zhuyinBadge = document.getElementById('zhuyin-decompose-badge');
   const zhuyinText = document.getElementById('zhuyin-decompose-text');
+
+  if (!gameState.currentLesson) return;
+  if (gameState.currentIndex >= gameState.currentLesson.text.length) {
+    if (window.handsOverlay) window.handsOverlay.setTarget(null, null, null);
+    if (hudName) hudName.innerText = '關卡完成';
+    if (hudHint) hudHint.innerText = '請進行成績結算';
+    if (zhuyinBadge) zhuyinBadge.classList.add('hidden');
+    return;
+  }
+
+  const currentChar = char || gameState.currentLesson.text[gameState.currentIndex];
+  const subKeys = getCharSubKeys(currentChar);
+  if (subKeys.length === 0) return;
+
+  const currentStep = subKeys[gameState.subCharIndex] || subKeys[0];
+  const targetKeyChar = currentStep.key;
+
+  // 1. 更新注音拆解 Badge (免選字即時進度導引)
   if (zhuyinBadge && zhuyinText) {
-    if (char && window.ZHUYIN_CHAR_MAP && window.ZHUYIN_CHAR_MAP[char]) {
-      zhuyinText.innerText = window.ZHUYIN_CHAR_MAP[char];
+    if (subKeys.length > 1) {
+      let partsHtml = `<strong style="color:var(--text-main); margin-right:4px;">${currentChar}：</strong>`;
+      subKeys.forEach((step, sIdx) => {
+        const stateClass = sIdx < gameState.subCharIndex ? 'zh-done' : (sIdx === gameState.subCharIndex ? 'zh-active' : 'zh-pending');
+        const checkIcon = sIdx < gameState.subCharIndex ? '✓ ' : '';
+        partsHtml += `<span class="zh-part ${stateClass}">${checkIcon}${step.label}</span>`;
+      });
+      zhuyinText.innerHTML = partsHtml;
       zhuyinBadge.classList.remove('hidden');
-    } else if (char && window.PUNCTUATION_HINT_MAP && window.PUNCTUATION_HINT_MAP[char]) {
-      zhuyinText.innerText = window.PUNCTUATION_HINT_MAP[char];
+    } else if (currentStep.hint) {
+      zhuyinText.innerHTML = `<strong style="color:var(--text-main); margin-right:4px;">${currentChar}</strong> → <span class="zh-part zh-active">${currentStep.label}</span>`;
       zhuyinBadge.classList.remove('hidden');
     } else {
       zhuyinBadge.classList.add('hidden');
     }
   }
 
-  if (!char) {
-    if (window.handsOverlay) window.handsOverlay.setTarget(null, null, null);
-    if (hudName) hudName.innerText = '關卡完成';
-    if (hudHint) hudHint.innerText = '請進行成績結算';
-    return;
-  }
-
+  // 2. 獲取按鍵在虛擬鍵盤上的 DOM ID
   let targetKeyId = null;
-  let targetFinger = null;
-  let charDisplay = (char === ' ') ? '空白鍵 (一聲)' : char;
-
-  // A. 空白鍵
-  if (char === ' ') {
-    targetKeyId = 'key-space';
-    targetFinger = 'RT';
-  }
-  // B. 注音符號匹配 (從 ZHUYIN_KEY_MAP 反查對應實體鍵)
-  else if (window.ZHUYIN_KEY_MAP && window.ZHUYIN_KEY_MAP[char]) {
-    const physicalKey = window.ZHUYIN_KEY_MAP[char];
-    targetKeyId = `key-${physicalKey}`;
-  }
-  // C. 常用全形標點映射
-  else if (char === '，') targetKeyId = 'key-,';
-  else if (char === '。') targetKeyId = 'key-.';
-  else if (char === '！') targetKeyId = 'key-1';
-  else if (char === '？') targetKeyId = 'key-/';
-  else if (char === '、') targetKeyId = 'key-\'';
-  else if (char === '；') targetKeyId = 'key-;';
-  else if (char === '：') targetKeyId = 'key-;';
-  else if (char === '「' || char === '」') targetKeyId = 'key-[';
-  // D. 英文字母直接匹配
-  else {
-    const lower = char.toLowerCase();
-    targetKeyId = `key-${lower}`;
-  }
+  if (targetKeyChar === ' ') targetKeyId = 'key-space';
+  else if (targetKeyChar === ',') targetKeyId = 'key-,';
+  else if (targetKeyChar === '.') targetKeyId = 'key-.';
+  else if (targetKeyChar === '/' || targetKeyChar === '?') targetKeyId = 'key-/';
+  else if (targetKeyChar === ';' || targetKeyChar === ':') targetKeyId = 'key-;';
+  else if (targetKeyChar === "'") targetKeyId = "key-'";
+  else if (targetKeyChar === '[') targetKeyId = 'key-[';
+  else if (targetKeyChar === ']') targetKeyId = 'key-]';
+  else if (targetKeyChar === '!') targetKeyId = 'key-1';
+  else targetKeyId = `key-${targetKeyChar.toLowerCase()}`;
 
   const targetEl = document.getElementById(targetKeyId);
+  let targetFinger = null;
+
   if (targetEl) {
     targetEl.classList.add('key-target');
     targetFinger = targetEl.dataset.finger;
 
-    // 啟動 3.2 秒停頓指引計時器 (Proposal V.2)
+    // 啟動 3.2 秒停頓指引計時器
     resetIdleGuidanceTimer(targetEl);
 
     const info = FINGER_INFO[targetFinger] || { hand: '單手', finger: '按鍵', color: '#ef4444', glow: 'rgba(239, 68, 68, 0.4)', icon: '👆', homeKey: '' };
 
-    // 1. 更新鍵盤頂部 HUD 指法導引列 (紅框風格)
+    // 3. 更新鍵盤頂部 HUD 指法導引列 (紅框風格)
     if (hudBadge) {
       hudBadge.style.borderColor = '#ef4444';
       hudBadge.style.boxShadow = `0 0 12px rgba(239, 68, 68, 0.4)`;
     }
     if (hudIcon) hudIcon.innerText = info.icon;
     if (hudName) hudName.innerText = `${info.hand} · ${info.finger}`;
+
+    const stepProgress = subKeys.length > 1 ? `（${currentChar} 注音拆解 ${gameState.subCharIndex + 1}/${subKeys.length}）` : '';
     if (hudHint) {
-      hudHint.innerHTML = `請使用 <strong style="color:#ef4444; font-size:0.95rem;">${info.hand}${info.finger}</strong> 輕敲 [ <strong style="color:var(--text-main); font-size:1.05rem;">${charDisplay}</strong> ]`;
+      hudHint.innerHTML = `請使用 <strong style="color:#ef4444; font-size:0.95rem;">${info.hand}${info.finger}</strong> 輕敲 [ <strong style="color:var(--text-main); font-size:1.05rem;">${currentStep.label}</strong> ] <span style="font-size:0.75rem; color:var(--accent-gold); font-weight:bold;">${stepProgress}</span>`;
     }
   }
 
-  // 2. 驅動覆蓋於鍵盤上的半透明人體工學十指動畫
+  // 4. 驅動覆蓋於鍵盤上的半透明人體工學十指動畫
   if (window.handsOverlay) {
-    window.handsOverlay.setTarget(targetKeyId, targetFinger, char);
+    window.handsOverlay.setTarget(targetKeyId, targetFinger, targetKeyChar);
   }
 }
 

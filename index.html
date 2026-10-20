@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
-  <link rel="stylesheet" href="css/styles.css?v=2.2">
+  <link rel="stylesheet" href="css/styles.css?v=2.3">
   
   <!-- Firebase SDK (以官方相容 Web 版本載入，未連線時自動無痛切換本機安全模式) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -170,9 +170,9 @@
           </div>
           <div class="stat-content">
             <span class="stat-title" style="color:var(--brand-primary); font-weight:800;">輸入法模式</span>
-            <span id="ime-guide-mode-text" style="font-size: 0.8rem; font-weight: 700; color: var(--text-main);">英數 / 實體盲打</span>
+            <span id="ime-guide-mode-text" style="font-size: 0.8rem; font-weight: 700; color: var(--text-main);">英數 / 簡易注音免選字</span>
             <span id="ime-guide-hint-text" style="font-size: 0.68rem; color: var(--text-muted); line-height:1.25; margin-top:2px;">
-              敲擊實體按鍵即可盲打
+              保持英數狀態，直接敲鍵盲打（免切換、免選字）
             </span>
           </div>
         </div>
@@ -190,8 +190,8 @@
       <section class="main-typing-column">
         <!-- 核心打字舞台 (Typing Arena - 緊湊高度設計，高僅約 110px) -->
         <div class="typing-arena" id="typing-arena">
-          <!-- 隱藏式真實輸入框 (使微軟注音等所有中文輸入法能正常呼叫與組字) -->
-          <input type="text" id="typing-input" class="typing-hidden-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" autofocus>
+          <!-- 隱藏式真實輸入框 (預設為英數狀態，免開啟微軟注音，避免選字換字困擾) -->
+          <input type="text" id="typing-input" class="typing-hidden-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="latin" lang="en" autofocus>
 
           <!-- 頂部模式標章、注音拼音提示、TTS朗讀與重來按鈕 -->
           <div class="stage-top-meta">
@@ -230,7 +230,7 @@
 
           <!-- 智慧防呆提示泡泡 -->
           <div id="ime-smart-alert" class="ime-smart-alert hidden">
-            <span>💡 貼心提醒：目前是中文字詞關卡，請按鍵盤上的 <strong>Shift</strong> 鍵切換成微軟注音輸入法喔！</span>
+            <span>💡 貼心提醒：本系統已啟用「簡易注音免選字」模式，保持電腦在「英/數」狀態即可直接流暢盲打！</span>
           </div>
 
           <!-- 點擊開始打字遮罩 (Focus Guard) -->
@@ -238,7 +238,7 @@
             <div class="focus-card">
               <div class="focus-icon">⌨️</div>
               <h3 style="font-size: 1.15rem; font-weight: 800; margin-bottom: 0.35rem;">點擊此處啟動打字冒險</h3>
-              <p style="font-size: 0.8rem; color: var(--text-muted);">系統準備就緒！支援微軟注音輸入法或直接敲擊實體鍵！</p>
+              <p style="font-size: 0.8rem; color: var(--text-muted);">系統準備就緒！已啟用「簡易注音免選字」模式，保持英數狀態即可流暢盲打！</p>
             </div>
           </div>
         </div>
@@ -786,10 +786,10 @@
   </footer>
 
   <!-- 核心模組腳本載入 (加入版本控制防止快取) -->
-  <script src="js/audio.js?v=2.2"></script>
-  <script src="js/lessons.js?v=2.2"></script>
-  <script src="js/shop.js?v=2.2"></script>
-  <script src="js/firebase-config.js?v=2.2"></script>
-  <script src="js/app.js?v=2.2"></script>
+  <script src="js/audio.js?v=2.3"></script>
+  <script src="js/lessons.js?v=2.3"></script>
+  <script src="js/shop.js?v=2.3"></script>
+  <script src="js/firebase-config.js?v=2.3"></script>
+  <script src="js/app.js?v=2.3"></script>
 </body>
 </html>
