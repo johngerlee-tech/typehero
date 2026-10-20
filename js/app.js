@@ -119,6 +119,7 @@ let gameState = {
 // ----------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   renderBilingualKeyboard();
+  initCustomLessonSystem();
   initTabs();
   initModals();
   initShopUI();
@@ -127,6 +128,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 預設載入注音第 1 關
   loadCategory('zhuyin');
+
+  // 語音朗讀發音按鈕綁定 (Proposal III.1.1)
+  const speakBtn = document.getElementById('btn-speak-text');
+  if (speakBtn) speakBtn.onclick = speakPromptText;
+
+  // 頂部導航成就榮譽牆按鈕綁定 (Proposal IV.3)
+  const achModal = document.getElementById('modal-achievements');
+  const achBtn = document.getElementById('btn-open-achievements');
+  const closeAchBtn = document.getElementById('close-achievements-btn');
+  if (achBtn && achModal) {
+    achBtn.onclick = () => {
+      renderAchievements();
+      achModal.classList.add('active');
+    };
+  }
+  if (closeAchBtn && achModal) {
+    closeAchBtn.onclick = () => {
+      achModal.classList.remove('active');
+    };
+  }
 
   // 初始化班級下拉選單與學生身分顯示
   if (window.cloudSync) {
@@ -424,6 +445,11 @@ function processCommittedText(text) {
         gameState.comboMax = gameState.comboCount;
       }
 
+      // 伴學精靈連擊打氣 (Proposal IV.2)
+      if (typeof updateMascot === 'function') {
+        updateMascot('combo', gameState.comboCount);
+      }
+
       // 手指動態敲擊下壓反饋
       const activeTargetEl = document.querySelector('.key-target');
       const activeFinger = activeTargetEl ? activeTargetEl.dataset.finger : null;
@@ -440,6 +466,9 @@ function processCommittedText(text) {
       // 標註為錯誤，打錯不卡關，游標依舊向前
       streamSpans[gameState.currentIndex].className = 'char-wrong';
       gameState.comboCount = 0; // 中斷連擊
+      if (typeof updateMascot === 'function') {
+        updateMascot('wrong');
+      }
       if (window.soundEngine) window.soundEngine.playError();
     }
 
@@ -928,8 +957,13 @@ function renderBilingualKeyboard() {
         ? `<span class="keycap-finger-dot" style="background: ${fingerInfo.color}; color: ${fingerInfo.color};" title="${fingerInfo.hand}${fingerInfo.finger}"></span>`
         : '';
 
+      // Proposal III.2.2: 實體鍵盤 F & J 基準鍵定位凸點標記 (Tactile Bumps)
+      const bumpHtml = (item.key === 'f' || item.key === 'j')
+        ? '<span class="key-home-bump" title="食指休息的基準鍵 (定位凸起橫線)"></span>'
+        : '';
+
       if (item.text) {
-        btn.innerHTML = `<span class="key-char-en">${item.text}</span>${dotHtml}`;
+        btn.innerHTML = `<span class="key-char-en">${item.text}</span>${bumpHtml}${dotHtml}`;
       } else {
         const enChar = item.key.toUpperCase();
         const zhChar = item.zh || '';
@@ -939,6 +973,7 @@ function renderBilingualKeyboard() {
           ${shiftChar ? `<span class="key-char-shift">${shiftChar}</span>` : ''}
           ${zhChar ? `<span class="key-char-zh">${zhChar}</span>` : ''}
           <span class="key-char-en">${enChar}</span>
+          ${bumpHtml}
           ${dotHtml}
         `;
       }
@@ -1053,6 +1088,16 @@ function loadCategory(category) {
     if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
     if (imeModeText) imeModeText.innerText = '微軟注音 / 中文字詞';
     if (imeHintText) imeHintText.innerText = '請按 Shift 切為注音，打完注音按空白選字';
+  } else if (category === 'custom') {
+    badgeEl.innerText = '🏫 教師課堂自訂特訓關卡';
+    if (inputEl) {
+      inputEl.setAttribute('inputmode', 'text');
+      inputEl.setAttribute('lang', 'zh-TW');
+    }
+    if (imeIcon) imeIcon.innerText = '🏫';
+    if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+    if (imeModeText) imeModeText.innerText = '課堂專屬特訓';
+    if (imeHintText) imeHintText.innerText = '請依老師課堂發布的指定題目內容練習';
   } else {
     badgeEl.innerText = '🔤 國小標準英文盲打挑戰';
     if (inputEl) {
@@ -1181,9 +1226,116 @@ function selectLesson(lessonId) {
 
   // 高亮預期按鍵與指位
   highlightTarget(target.text[0]);
+  if (typeof updateMascot === 'function') updateMascot('start');
 
   // 自動聚焦
   setTimeout(focusTyping, 60);
+}
+
+// ----------------------------------------------------
+// 8.0 語音朗讀、伴學精靈與停頓指引輔助控制器
+// ----------------------------------------------------
+let idleGuidanceTimer = null;
+let currentGuidanceKeyEl = null;
+
+function clearIdleGuidance() {
+  if (idleGuidanceTimer) {
+    clearTimeout(idleGuidanceTimer);
+    idleGuidanceTimer = null;
+  }
+  if (currentGuidanceKeyEl) {
+    currentGuidanceKeyEl.classList.remove('key-guidance-active');
+    currentGuidanceKeyEl = null;
+  }
+}
+
+function resetIdleGuidanceTimer(targetEl) {
+  clearIdleGuidance();
+  if (!targetEl) return;
+  idleGuidanceTimer = setTimeout(() => {
+    targetEl.classList.add('key-guidance-active');
+    currentGuidanceKeyEl = targetEl;
+    if (typeof updateMascot === 'function') updateMascot('stuck');
+  }, 3200);
+}
+
+// Proposal III.1.1: Web Speech API 語音朗讀輔助 (兒童友善語調)
+function speakPromptText() {
+  if (!('speechSynthesis' in window)) {
+    alert('您的瀏覽器不支援語音朗讀功能');
+    return;
+  }
+  window.speechSynthesis.cancel();
+
+  const lesson = gameState.currentLesson;
+  if (!lesson || !lesson.text) return;
+
+  const utter = new SpeechSynthesisUtterance(lesson.text.trim());
+  if (gameState.currentCategory === 'english') {
+    utter.lang = 'en-US';
+    utter.rate = 0.85;
+    utter.pitch = 1.05;
+  } else {
+    utter.lang = 'zh-TW';
+    utter.rate = 0.85;
+    utter.pitch = 1.1;
+  }
+
+  const btnSpeak = document.getElementById('btn-speak-text');
+  if (btnSpeak) btnSpeak.classList.add('speaking');
+  utter.onend = () => {
+    if (btnSpeak) btnSpeak.classList.remove('speaking');
+  };
+  utter.onerror = () => {
+    if (btnSpeak) btnSpeak.classList.remove('speaking');
+  };
+
+  window.speechSynthesis.speak(utter);
+}
+
+// Proposal IV.2: 鍵盤守護精靈伴學小卡 (動態問候與情緒回饋)
+function updateMascot(type, param) {
+  const bubble = document.getElementById('mascot-speech-bubble');
+  const icon = document.getElementById('mascot-character-icon');
+  if (!bubble) return;
+
+  switch (type) {
+    case 'start':
+      bubble.innerText = '加油！看著螢幕手指，不要低頭看鍵盤，慢慢打最快喔！';
+      if (icon) icon.innerText = '🐱';
+      break;
+    case 'combo':
+      if (param >= 20) {
+        bubble.innerText = '🔥 太狂啦！連續擊中 20 次！進入狂熱 FEVER 模式！';
+        if (icon) icon.innerText = '🦁';
+      } else if (param >= 10) {
+        bubble.innerText = '⚡ 節奏超棒！連續命中 10 次！手腕要放鬆喔！';
+        if (icon) icon.innerText = '🦊';
+      } else if (param >= 5) {
+        bubble.innerText = '✨ 很好！五連擊！保持端正坐姿！';
+        if (icon) icon.innerText = '🐱';
+      }
+      break;
+    case 'wrong':
+      bubble.innerText = '沒關係！不要慌張，看清楚指引手指再按下！';
+      if (icon) icon.innerText = '🐶';
+      break;
+    case 'stuck':
+      bubble.innerText = '卡住了嗎？看鍵盤上的金黃色呼吸光暈，就是那個鍵！';
+      if (icon) icon.innerText = '💡';
+      break;
+    case 'pass':
+      bubble.innerText = '🎉 太棒了！順利通過考驗，你又往前邁進一步了！';
+      if (icon) icon.innerText = '🏆';
+      break;
+    case 'fail':
+      bubble.innerText = '別灰心！雙手放回基準鍵，我們再來挑戰一次！';
+      if (icon) icon.innerText = '🌱';
+      break;
+    default:
+      bubble.innerText = '雙手食指放在 F 與 J 上，準備開始練習囉！';
+      if (icon) icon.innerText = '🐱';
+  }
 }
 
 // ----------------------------------------------------
@@ -1194,13 +1346,29 @@ function highlightFinger(fingerId) {
 }
 
 function highlightTarget(char) {
-  // 清除現有鍵位高亮
+  // 清除現有鍵位高亮與停頓發光
+  clearIdleGuidance();
   document.querySelectorAll('.keycap').forEach(el => el.classList.remove('key-target'));
 
   const hudBadge = document.getElementById('hud-finger-badge');
   const hudName = document.getElementById('hud-finger-name');
   const hudIcon = document.getElementById('hud-hand-icon');
   const hudHint = document.getElementById('hud-action-hint');
+
+  // Proposal III.1.2: 常用國小生字詞注音聲調拆解或標點快速指引
+  const zhuyinBadge = document.getElementById('zhuyin-decompose-badge');
+  const zhuyinText = document.getElementById('zhuyin-decompose-text');
+  if (zhuyinBadge && zhuyinText) {
+    if (char && window.ZHUYIN_CHAR_MAP && window.ZHUYIN_CHAR_MAP[char]) {
+      zhuyinText.innerText = window.ZHUYIN_CHAR_MAP[char];
+      zhuyinBadge.classList.remove('hidden');
+    } else if (char && window.PUNCTUATION_HINT_MAP && window.PUNCTUATION_HINT_MAP[char]) {
+      zhuyinText.innerText = window.PUNCTUATION_HINT_MAP[char];
+      zhuyinBadge.classList.remove('hidden');
+    } else {
+      zhuyinBadge.classList.add('hidden');
+    }
+  }
 
   if (!char) {
     if (window.handsOverlay) window.handsOverlay.setTarget(null, null, null);
@@ -1242,6 +1410,9 @@ function highlightTarget(char) {
   if (targetEl) {
     targetEl.classList.add('key-target');
     targetFinger = targetEl.dataset.finger;
+
+    // 啟動 3.2 秒停頓指引計時器 (Proposal V.2)
+    resetIdleGuidanceTimer(targetEl);
 
     const info = FINGER_INFO[targetFinger] || { hand: '單手', finger: '按鍵', color: '#ef4444', glow: 'rgba(239, 68, 68, 0.4)', icon: '👆', homeKey: '' };
 
@@ -1314,6 +1485,81 @@ function updateStats() {
 }
 
 // ----------------------------------------------------
+// 10.1 成就勳章系統 (Proposal IV.3)
+// ----------------------------------------------------
+const ACHIEVEMENTS_LIST = [
+  { id: 'first_pass', icon: '🌱', name: '啟航學徒', desc: '成功通過任何一個打字挑戰關卡', reward: 50 },
+  { id: 'combo_10', icon: '🔥', name: '連擊好手', desc: '單一關卡中達成 10 連擊 Combo', reward: 50 },
+  { id: 'combo_30', icon: '⚡', name: '狂熱連擊王', desc: '單一關卡中達成 30 連擊 Combo', reward: 50 },
+  { id: 'accuracy_100', icon: '🎯', name: '百步穿楊', desc: '以 100% 完美輸入準確率通關', reward: 50 },
+  { id: 'speed_30', icon: '🏎️', name: '疾速小神童', desc: '單關打字速度突破 30 WPM', reward: 50 },
+  { id: 'speed_50', icon: '🚀', name: '音速大師', desc: '單關打字速度突破 50 WPM', reward: 50 },
+  { id: 'stars_10', icon: '🌟', name: '群星閃耀', desc: '累計收集滿 10 個關卡三星評等', reward: 50 }
+];
+
+function checkAndUnlockAchievement(id) {
+  if (!window.shopManager) return;
+  const pData = window.shopManager.data;
+  if (!pData.unlockedAchievements) pData.unlockedAchievements = [];
+  if (pData.unlockedAchievements.includes(id)) return;
+
+  const ach = ACHIEVEMENTS_LIST.find(a => a.id === id);
+  if (!ach) return;
+
+  pData.unlockedAchievements.push(id);
+  pData.coins += ach.reward;
+  window.shopManager.saveData();
+  window.shopManager.updateUI();
+
+  if (window.soundEngine) window.soundEngine.playCoin();
+
+  // 彈出精緻成就解鎖 Toast
+  const toast = document.createElement('div');
+  toast.className = 'achievement-toast';
+  toast.innerHTML = `
+    <div style="font-size: 2rem; line-height: 1;">${ach.icon}</div>
+    <div>
+      <div style="font-weight: 800; font-size: 0.92rem; color: #fbbf24;">🏅 解鎖新成就：【${ach.name}】！</div>
+      <div style="font-size: 0.74rem; color: #fff; margin-top: 2px;">${ach.desc} (+${ach.reward} 星幣)</div>
+    </div>
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.add('show'), 50);
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 400);
+  }, 4200);
+}
+
+function renderAchievements() {
+  const grid = document.getElementById('achievement-grid');
+  if (!grid || !window.shopManager) return;
+
+  const unlocked = window.shopManager.data.unlockedAchievements || [];
+  grid.innerHTML = '';
+
+  ACHIEVEMENTS_LIST.forEach(ach => {
+    const isUnlocked = unlocked.includes(ach.id);
+    const card = document.createElement('div');
+    card.className = `achievement-card ${isUnlocked ? 'unlocked' : 'locked'}`;
+    card.innerHTML = `
+      <div class="achievement-icon">${ach.icon}</div>
+      <div class="achievement-info" style="flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="achievement-name">${ach.name}</div>
+          <span class="achievement-status-tag ${isUnlocked ? 'achievement-status-unlocked' : 'achievement-status-locked'}">
+            ${isUnlocked ? '✓ 已達成' : '🔒 未解鎖'}
+          </span>
+        </div>
+        <div class="achievement-desc">${ach.desc}</div>
+        <div class="achievement-reward">達成獎勵：💰 ${ach.reward} 星幣</div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ----------------------------------------------------
 // 11. 關卡完成結算 (70% 通關門檻分支與彈窗)
 // ----------------------------------------------------
 function finishLesson() {
@@ -1352,6 +1598,13 @@ function finishLesson() {
     }
 
     if (window.soundEngine) window.soundEngine.playFanfare();
+    if (typeof updateMascot === 'function') updateMascot('pass');
+
+    // 檢查通關成就 (Proposal IV.3)
+    checkAndUnlockAchievement('first_pass');
+    if (finalAcc === 100) checkAndUnlockAchievement('accuracy_100');
+    if (finalWpm >= 30) checkAndUnlockAchievement('speed_30');
+    if (finalWpm >= 50) checkAndUnlockAchievement('speed_50');
 
     let reward = { earnedCoins: 30, earnedExp: 50 };
     if (window.shopManager) {
@@ -1365,6 +1618,10 @@ function finishLesson() {
         window.shopManager.data.lessonStars = savedStars;
         window.shopManager.saveData();
       }
+
+      // 檢查累計 10 個三星成就
+      const total3Stars = Object.values(savedStars).filter(s => s >= 3).length;
+      if (total3Stars >= 10) checkAndUnlockAchievement('stars_10');
     }
 
     if (window.cloudSync) {
@@ -1394,6 +1651,7 @@ function finishLesson() {
   } else {
     // === 未達標準 (準確率 < 70%) ===
     if (window.soundEngine) window.soundEngine.playError();
+    if (typeof updateMascot === 'function') updateMascot('fail');
 
     // 未達標僅給予 5 幣安慰參加獎
     if (window.shopManager) {
@@ -1424,6 +1682,10 @@ function finishLesson() {
 
     nextBtn.style.display = 'none'; // 隱藏下一關按鈕，強制必須重新挑戰通過才能繼續！
   }
+
+  // 連擊成就檢驗
+  if (gameState.comboMax >= 10) checkAndUnlockAchievement('combo_10');
+  if (gameState.comboMax >= 30) checkAndUnlockAchievement('combo_30');
 
   document.getElementById('modal-result').classList.add('active');
 
@@ -1462,13 +1724,20 @@ function initModals() {
   };
   document.getElementById('close-shop-btn').onclick = () => shopModal.classList.remove('active');
 
-  // 排行榜彈窗
+  // 排行榜彈窗 (Proposal IV.4 多元榮譽評價榜單)
   const leaderModal = document.getElementById('modal-leaderboard');
   document.getElementById('nav-btn-leaderboard').onclick = async () => {
     leaderModal.classList.add('active');
-    await renderLeaderboard();
+    await renderLeaderboard('wpm');
   };
   document.getElementById('close-leader-btn').onclick = () => leaderModal.classList.remove('active');
+
+  const lbWpm = document.getElementById('lb-tab-wpm');
+  const lbAcc = document.getElementById('lb-tab-accuracy');
+  const lbDil = document.getElementById('lb-tab-diligence');
+  if (lbWpm) lbWpm.onclick = () => renderLeaderboard('wpm');
+  if (lbAcc) lbAcc.onclick = () => renderLeaderboard('accuracy');
+  if (lbDil) lbDil.onclick = () => renderLeaderboard('diligence');
 
   // 1. 個人班級雲端設定彈窗
   const profileModal = document.getElementById('modal-profile');
@@ -1810,6 +2079,82 @@ function initModals() {
   if (testFirebaseBtn) {
     testFirebaseBtn.onclick = runFirebaseDiagnostic;
   }
+
+  // 後臺：課堂自訂特訓題目發布與清除 (Proposal IV.1)
+  const saveCustomBtn = document.getElementById('admin-btn-save-custom');
+  const clearCustomBtn = document.getElementById('admin-btn-clear-custom');
+  const customTitleInp = document.getElementById('admin-custom-title');
+  const customTextInp = document.getElementById('admin-custom-text');
+
+  if (saveCustomBtn && customTextInp) {
+    const savedCustom = localStorage.getItem('typehero_custom_lesson');
+    if (savedCustom) {
+      try {
+        const parsed = JSON.parse(savedCustom);
+        if (customTitleInp) customTitleInp.value = parsed.title || '';
+        customTextInp.value = parsed.text || '';
+      } catch (e) {}
+    }
+
+    saveCustomBtn.onclick = () => {
+      const text = customTextInp.value.trim();
+      const title = (customTitleInp ? customTitleInp.value.trim() : '') || '課堂自訂特訓題目';
+      if (!text) {
+        alert('⚠️ 請輸入特訓題目的內容文字！');
+        customTextInp.focus();
+        return;
+      }
+      const data = { title, summary: '今日課堂專屬題目', text };
+      localStorage.setItem('typehero_custom_lesson', JSON.stringify(data));
+      initCustomLessonSystem();
+
+      alert(`✅ 課堂特訓題目已成功發布！\n學生於課程分類點選「🏫 課堂自訂」即可開始打字！`);
+    };
+  }
+
+  if (clearCustomBtn) {
+    clearCustomBtn.onclick = () => {
+      if (confirm('確定要清除目前發布的課堂自訂題目嗎？')) {
+        localStorage.removeItem('typehero_custom_lesson');
+        delete window.COURSES.custom;
+        const tabCustom = document.getElementById('tab-custom-lesson');
+        if (tabCustom) tabCustom.style.display = 'none';
+        if (customTitleInp) customTitleInp.value = '';
+        if (customTextInp) customTextInp.value = '';
+        alert('✅ 已清除自訂題目！');
+        if (gameState.currentCategory === 'custom') {
+          loadCategory('zhuyin');
+        }
+      }
+    };
+  }
+}
+
+/**
+ * 初始化課堂自訂題目系統 (Proposal IV.1)
+ */
+function initCustomLessonSystem() {
+  const saved = localStorage.getItem('typehero_custom_lesson');
+  const tabCustom = document.getElementById('tab-custom-lesson');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      if (data && data.text) {
+        window.COURSES.custom = [{
+          id: 'custom-1',
+          title: data.title || '課堂自訂特訓題目',
+          summary: data.summary || '今日課堂專屬題目',
+          keys: [],
+          text: data.text
+        }];
+        if (tabCustom) tabCustom.style.display = 'inline-flex';
+        return;
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+  if (tabCustom) tabCustom.style.display = 'none';
 }
 
 /**
@@ -2047,14 +2392,65 @@ function renderShopItems(tabCategory) {
 }
 
 // ----------------------------------------------------
-// 14. 排行榜資料渲染
+// 14. 多元評價排行榜資料渲染 (Proposal IV.4)
 // ----------------------------------------------------
-async function renderLeaderboard() {
+let currentLeaderboardTab = 'wpm';
+
+async function renderLeaderboard(type = currentLeaderboardTab) {
+  currentLeaderboardTab = type;
   const container = document.getElementById('leaderboard-list');
+  if (!container) return;
+
+  // 更新分頁按鈕視覺狀態
+  const tabMap = {
+    'wpm': document.getElementById('lb-tab-wpm'),
+    'accuracy': document.getElementById('lb-tab-accuracy'),
+    'diligence': document.getElementById('lb-tab-diligence')
+  };
+
+  Object.keys(tabMap).forEach(key => {
+    const btn = tabMap[key];
+    if (btn) {
+      if (key === type) {
+        btn.style.background = 'var(--brand-primary)';
+        btn.style.color = '#fff';
+        btn.style.borderColor = 'var(--brand-primary)';
+      } else {
+        btn.style.background = 'transparent';
+        btn.style.color = 'var(--text-muted)';
+        btn.style.borderColor = 'var(--border-color)';
+      }
+    }
+  });
+
   container.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text-muted);">正在載入即時榮譽榜...</div>';
 
-  if (!window.cloudSync) return;
-  const list = await window.cloudSync.fetchTopScores(10);
+  if (!window.cloudSync) {
+    container.innerHTML = '<div style="text-align:center; padding:1.5rem; color:#ef4444;">雲端模組未載入</div>';
+    return;
+  }
+
+  const rawList = await window.cloudSync.fetchTopScores(30);
+
+  let filtered = [...rawList];
+  if (type === 'wpm') {
+    // 神速榜：依 WPM 降序
+    filtered.sort((a, b) => (b.wpm || 0) - (a.wpm || 0));
+  } else if (type === 'accuracy') {
+    // 百步穿楊榜：100% 準確率優先，次之按 WPM
+    filtered = filtered.filter(item => (item.accuracy || 0) >= 95);
+    filtered.sort((a, b) => (b.accuracy || 0) - (a.accuracy || 0) || (b.wpm || 0) - (a.wpm || 0));
+  } else if (type === 'diligence') {
+    // 勤學毅力榜：依累積練習按鍵總數或星星數
+    filtered.sort((a, b) => ((b.stars || 0) + (b.totalKeys || 0)) - ((a.stars || 0) + (a.totalKeys || 0)) || (b.wpm || 0) - (a.wpm || 0));
+  }
+
+  const list = filtered.slice(0, 10);
+
+  if (list.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text-muted); font-size:0.85rem;">目前尚無符合此評價維度的紀錄，快來搶先上榜！</div>';
+    return;
+  }
 
   container.innerHTML = '';
   list.forEach((item, index) => {
@@ -2074,9 +2470,10 @@ async function renderLeaderboard() {
       </div>
       <div style="text-align:right;">
         <div style="font-size:1.1rem; font-weight:800; color:var(--brand-primary);">${item.wpm} <span style="font-size:0.7rem;">字/分 (WPM)</span></div>
-        <div style="font-size:0.72rem; color:#10b981;">準確率 ${item.accuracy}%</div>
+        <div style="font-size:0.72rem; color:#10b981; font-weight:600;">輸入準確率 ${item.accuracy}%</div>
       </div>
     `;
     container.appendChild(row);
   });
 }
+

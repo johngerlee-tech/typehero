@@ -553,64 +553,126 @@ main {
   50% { opacity: 1; transform: scale(1.25) rotate(15deg); }
 }
 
-/* 需求 3: 鍵盤與側邊動態儀表板並列佈局 (避免縱向版面過長) */
-.keyboard-stage-wrapper {
+/* ==========================================================================
+   核心兩欄並列工作台 (兩欄並列：240px 側邊儀表板 + 右側打字舞台與虛擬鍵盤，單屏一覽無遺！)
+   ========================================================================== */
+.two-column-workspace {
   display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 1.25rem;
-  align-items: stretch;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 1.15rem;
+  align-items: start;
   width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
 }
 
 .stats-sidebar {
+  width: 240px;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  justify-content: space-between;
+  gap: 0.55rem;
 }
 
 .stats-sidebar .stat-box {
-  padding: 0.65rem 0.85rem;
-  gap: 0.75rem;
+  padding: 0.55rem 0.8rem;
+  gap: 0.65rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-sm);
 }
 
 .stats-sidebar .stat-icon {
-  width: 44px;
-  height: 44px;
-  font-size: 1.75rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+  width: 38px;
+  height: 38px;
+  font-size: 1.45rem;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
 .stats-sidebar .stat-val {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
 }
 
 .stats-sidebar .stat-title {
   font-size: 0.68rem;
 }
 
-@media (max-width: 1024px) {
-  .keyboard-stage-wrapper {
+/* 鍵盤守護小精靈伴學小卡 (Proposal IV.1) */
+.mascot-companion-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.mascot-companion-card:hover {
+  border-color: var(--brand-primary);
+  transform: translateY(-1px);
+}
+
+.mascot-avatar {
+  font-size: 2rem;
+  line-height: 1;
+  flex-shrink: 0;
+  animation: mascotBounce 2.5s infinite ease-in-out;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
+  user-select: none;
+}
+
+@keyframes mascotBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px) scale(1.05); }
+}
+
+.mascot-speech-bubble {
+  font-size: 0.72rem;
+  color: var(--text-main);
+  font-weight: 700;
+  line-height: 1.35;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  position: relative;
+  width: 100%;
+}
+
+.main-typing-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 860px) {
+  .two-column-workspace {
     grid-template-columns: 1fr;
   }
   .stats-sidebar {
+    width: 100%;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   }
 }
 
-/* 需求 5: 智慧輸入法防呆切換泡泡提示 */
+/* 智慧輸入法防呆切換泡泡提示 */
 .ime-smart-alert {
   position: absolute;
-  top: 14px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(135deg, #f59e0b, #d97706);
   color: #ffffff;
-  padding: 0.5rem 1.15rem;
+  padding: 0.45rem 1rem;
   border-radius: var(--radius-full);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
   box-shadow: 0 8px 24px rgba(245, 158, 11, 0.5);
   z-index: 100;
@@ -752,19 +814,22 @@ body.in-fullscreen-mode footer {
 /* ==========================================================================
    核心打字舞台 (Typing Stage)
    ========================================================================== */
+/* ==========================================================================
+   核心打字舞台 (Typing Stage - 緊湊單屏無滾動設計)
+   ========================================================================== */
 .typing-arena {
   background: var(--bg-card);
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 2.5rem 2rem 2rem;
+  border-radius: var(--radius-md);
+  padding: 2.1rem 1.25rem 0.85rem;
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 250px;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.25);
+  min-height: auto;
+  box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.25);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -783,25 +848,93 @@ body.in-fullscreen-mode footer {
 
 .stage-top-meta {
   position: absolute;
-  top: 1rem;
-  left: 1.5rem;
-  right: 1.5rem;
+  top: 0.45rem;
+  left: 0.85rem;
+  right: 0.85rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
 }
 
 .lesson-badge {
   background: rgba(56, 189, 248, 0.12);
   color: var(--brand-primary);
   border: 1px solid var(--border-glow);
-  padding: 0.25rem 0.75rem;
+  padding: 0.2rem 0.65rem;
   border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
+}
+
+/* 中文生字詞即時注音聲調拆解 (Proposal III.1.2) */
+.zhuyin-decompose-badge {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.74rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  letter-spacing: 1px;
+}
+
+.zhuyin-decompose-badge.hidden {
+  display: none !important;
+}
+
+.zhuyin-decompose-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-weight: normal;
+}
+
+.zhuyin-decompose-text {
+  color: #fde047;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+/* 語音朗讀按鈕 (Proposal III.3.3) */
+.btn-voice-speak {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid var(--border-glow);
+  color: var(--text-main);
+  padding: 0.22rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.btn-voice-speak:hover {
+  background: rgba(56, 189, 248, 0.3);
+  border-color: var(--brand-primary);
+  transform: scale(1.05);
+  box-shadow: 0 0 10px var(--brand-glow);
+}
+
+.btn-voice-speak.speaking {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  color: #34d399;
+  animation: voicePulse 1s infinite alternate;
+}
+
+@keyframes voicePulse {
+  0% { transform: scale(1); box-shadow: 0 0 4px #10b981; }
+  100% { transform: scale(1.08); box-shadow: 0 0 14px #10b981; }
 }
 
 /* 核心字元展示區 (Typing Display) */
@@ -809,14 +942,19 @@ body.in-fullscreen-mode footer {
   width: 100%;
   max-width: 980px;
   font-family: var(--font-mono);
-  font-size: 2.3rem;
-  line-height: 1.8;
-  letter-spacing: 0.12em;
+  font-size: 2.1rem;
+  line-height: 1.35;
+  letter-spacing: 0.1em;
   text-align: center;
   white-space: pre-wrap;
   word-break: break-all;
   user-select: none;
   outline: none;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 /* 字元狀態色 */
@@ -833,6 +971,7 @@ body.in-fullscreen-mode footer {
   transition: color 0.08s ease;
 }
 
+/* 溫和防挫折果凍晃動反饋 (Proposal III.3.2) */
 .char-wrong {
   color: var(--wrong-color);
   background-color: var(--wrong-bg);
@@ -841,6 +980,13 @@ body.in-fullscreen-mode footer {
   text-decoration: underline;
   text-decoration-thickness: 3px;
   text-shadow: 0 0 10px var(--wrong-glow);
+  animation: gentleWobble 0.35s ease;
+}
+
+@keyframes gentleWobble {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px) rotate(-3deg); }
+  75% { transform: translateX(4px) rotate(3deg); }
 }
 
 .char-cursor {
@@ -1000,18 +1146,18 @@ body.in-fullscreen-mode footer {
   gap: 1.25rem;
 }
 
-/* 雙語虛擬鍵盤面板 (Bilingual Virtual Keyboard) */
+/* 雙語虛擬鍵盤面板 (Bilingual Virtual Keyboard - 單屏緊湊版) */
 .keyboard-box {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem 1.25rem 1.75rem;
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.85rem 1.15rem;
   overflow-x: auto;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   position: relative;
   width: 100%;
-  max-width: 1060px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
 }
 
 /* 鍵盤頂部動態指法導航與透明度工具列 */
@@ -1020,13 +1166,25 @@ body.in-fullscreen-mode footer {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.5rem;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  padding: 0.6rem 1rem;
-  border-radius: var(--radius-md);
-  margin-bottom: 0.85rem;
-  min-width: 760px;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.55rem;
+  min-width: 0;
+}
+
+.home-key-guide-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .keyboard-finger-hud {
@@ -1231,6 +1389,36 @@ body.in-fullscreen-mode footer {
 .key-target .key-char-zh {
   color: #ef4444 !important;
   text-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+/* 實體鍵盤 F & J 基準鍵觸感凸點刻痕 (Proposal III.2.2) */
+.key-home-bump {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+/* 卡關停頓 3 秒金黃呼吸發光指引 (Proposal V.2) */
+.key-guidance-active {
+  outline: 3px solid #fbbf24 !important;
+  outline-offset: -1px !important;
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 24px #fbbf24, inset 0 0 12px rgba(251, 191, 36, 0.5) !important;
+  animation: guidancePulse 1.1s infinite alternate !important;
+  position: relative;
+  z-index: 10;
+}
+
+@keyframes guidancePulse {
+  0% { transform: scale(1); box-shadow: 0 0 12px rgba(251, 191, 36, 0.6); }
+  100% { transform: scale(1.08); box-shadow: 0 0 28px rgba(251, 191, 36, 1), 0 0 10px #ffffff; }
 }
 
 /* ==========================================================================
@@ -1964,3 +2152,111 @@ footer {
 .admin-batch-wrapper.hidden {
   display: none;
 }
+
+/* ==========================================================================
+   成就徽章榮譽牆樣式 (Proposal IV.3)
+   ========================================================================== */
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.achievement-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.achievement-card.unlocked {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(99, 102, 241, 0.08));
+  box-shadow: 0 4px 15px rgba(251, 191, 36, 0.15);
+}
+
+.achievement-card.locked {
+  opacity: 0.52;
+  filter: grayscale(0.7);
+}
+
+.achievement-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.achievement-name {
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: var(--text-main);
+}
+
+.achievement-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.achievement-reward {
+  font-size: 0.7rem;
+  color: var(--accent-gold);
+  font-weight: bold;
+  margin-top: 3px;
+}
+
+.achievement-status-tag {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+}
+
+.achievement-status-unlocked {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.achievement-status-locked {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+}
+
+/* 成就解鎖懸浮通知 Toast */
+.achievement-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.98));
+  border: 1.5px solid #fbbf24;
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(251, 191, 36, 0.35);
+  z-index: 9999;
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: none;
+}
+
+.achievement-toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+

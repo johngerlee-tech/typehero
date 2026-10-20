@@ -51,7 +51,9 @@ class ShopManager {
     const raw = localStorage.getItem(this.storageKey);
     if (raw) {
       try {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        parsed.unlockedAchievements = parsed.unlockedAchievements || [];
+        return parsed;
       } catch (e) {
         console.error('讀取存檔失敗，重設存檔');
       }
@@ -66,7 +68,8 @@ class ShopManager {
       equippedSound: 'mechanical',
       unlockedAvatars: ['cat'],
       equippedAvatar: 'cat',
-      lessonStars: {} // { 'zh-1': 3, 'en-1': 2 }
+      lessonStars: {}, // { 'zh-1': 3, 'en-1': 2 }
+      unlockedAchievements: []
     };
   }
 
