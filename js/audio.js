@@ -70,6 +70,18 @@ class SoundEngine {
       case 'chime':
         this.playChimeSound(combo);
         break;
+      case 'guitar':
+        this.playGuitarPluck(combo);
+        break;
+      case 'drum':
+        this.playDrumRimshot(combo);
+        break;
+      case 'gameboy':
+        this.playGameboyHop(combo);
+        break;
+      case 'thunder':
+        this.playThunderStrike(combo);
+        break;
       case 'mechanical':
       default:
         this.playMechanicalClick();
@@ -325,6 +337,149 @@ class SoundEngine {
     osc2.start(now);
     osc1.stop(now + 0.36);
     osc2.stop(now + 0.36);
+  }
+
+  /**
+   * 9. 晨曦清脆木吉他 (Acoustic Guitar Pluck)
+   * 雙重諧波微泛音 + 撥片滑音起音 + 溫潤自然衰減
+   */
+  playGuitarPluck(combo = 0) {
+    const now = this.audioCtx.currentTime;
+    const noteIdx = combo % this.scaleNotes.length;
+    const freq = this.scaleNotes[noteIdx];
+
+    const osc1 = this.audioCtx.createOscillator();
+    const osc2 = this.audioCtx.createOscillator();
+    const gain = this.audioCtx.createGain();
+    const filter = this.audioCtx.createBiquadFilter();
+
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(freq, now);
+    osc1.frequency.exponentialRampToValueAtTime(freq * 0.99, now + 0.15);
+
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(freq * 2, now);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2800, now);
+    filter.frequency.exponentialRampToValueAtTime(700, now + 0.2);
+
+    gain.gain.setValueAtTime(0.24, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.audioCtx.destination);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + 0.29);
+    osc2.stop(now + 0.29);
+  }
+
+  /**
+   * 10. 搖滾節奏小軍鼓 (Snare / Rimshot Drum)
+   * 俐落清脆的金屬邊擊敲擊感與短促白噪音爆音
+   */
+  playDrumRimshot(combo = 0) {
+    const now = this.audioCtx.currentTime;
+
+    const osc = this.audioCtx.createOscillator();
+    const oscGain = this.audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.exponentialRampToValueAtTime(60, now + 0.04);
+    oscGain.gain.setValueAtTime(0.28, now);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+    osc.connect(oscGain);
+    oscGain.connect(this.audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.05);
+
+    const bufferSize = Math.floor(this.audioCtx.sampleRate * 0.035);
+    const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const noise = this.audioCtx.createBufferSource();
+    noise.buffer = buffer;
+
+    const noiseFilter = this.audioCtx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.setValueAtTime(1400, now);
+    noiseFilter.Q.setValueAtTime(3.0, now);
+
+    const noiseGain = this.audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.22, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(this.audioCtx.destination);
+
+    noise.start(now);
+    noise.stop(now + 0.04);
+  }
+
+  /**
+   * 11. 奇幻冒險金幣跳 (GameBoy Chiptune Hop)
+   * 經典 8-bit 雙音快速階梯方波跳音 (Arpeggio Jump)
+   */
+  playGameboyHop(combo = 0) {
+    const now = this.audioCtx.currentTime;
+    const noteIdx = combo % this.scaleNotes.length;
+    const baseFreq = this.scaleNotes[noteIdx] * 1.5;
+
+    const osc = this.audioCtx.createOscillator();
+    const gain = this.audioCtx.createGain();
+
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(baseFreq, now);
+    osc.frequency.setValueAtTime(baseFreq * 1.5, now + 0.022);
+    osc.frequency.setValueAtTime(baseFreq * 2.0, now + 0.044);
+
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.setValueAtTime(0.12, now + 0.044);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+
+    osc.connect(gain);
+    gain.connect(this.audioCtx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.08);
+  }
+
+  /**
+   * 12. 史詩雷霆重低音 (Epic Thunder Strike)
+   * 次低頻能量脈衝 (Sub-Bass Dive) + 重裝厚實低音打擊
+   */
+  playThunderStrike(combo = 0) {
+    const now = this.audioCtx.currentTime;
+
+    const osc = this.audioCtx.createOscillator();
+    const gain = this.audioCtx.createGain();
+    const filter = this.audioCtx.createBiquadFilter();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(110, now);
+    osc.frequency.exponentialRampToValueAtTime(32, now + 0.12);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(260, now);
+    filter.frequency.exponentialRampToValueAtTime(60, now + 0.12);
+    filter.Q.setValueAtTime(4.0, now);
+
+    gain.gain.setValueAtTime(0.38, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.audioCtx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.14);
   }
 
   /**

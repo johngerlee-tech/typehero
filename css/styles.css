@@ -185,6 +185,86 @@ body.theme-ice {
   --key-shadow: 0 4px 0 #051d30;
 }
 
+/* 主題外觀：熔岩黑曜戰魂 (Volcano Lava) - 深黑與熾熱赤紅高對比 */
+body.theme-volcano {
+  --bg-primary: #150505;
+  --bg-secondary: #240909;
+  --bg-card: rgba(42, 12, 12, 0.88);
+  --bg-card-hover: rgba(58, 18, 18, 0.98);
+  --border-color: rgba(239, 68, 68, 0.25);
+  --border-glow: rgba(239, 68, 68, 0.65);
+  --text-main: #fef2f2;
+  --text-muted: #fca5a5;
+  --brand-primary: #ef4444;
+  --brand-hover: #dc2626;
+  --brand-glow: rgba(239, 68, 68, 0.45);
+  --key-bg: #2d0e0e;
+  --key-text: #fee2e2;
+  --key-border: #dc2626;
+  --key-shadow: 0 4px 0 #7f1d1d;
+  --key-active-shadow: 0 1px 0 #7f1d1d;
+}
+
+/* 主題外觀：蜜糖檸檬向日葵 (Honey Lemon) - 溫暖明亮陽光淺色 */
+body.theme-honey {
+  --bg-primary: #fffbeb;
+  --bg-secondary: #fef3c7;
+  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-card-hover: rgba(255, 255, 255, 1);
+  --border-color: rgba(245, 158, 11, 0.25);
+  --border-glow: rgba(245, 158, 11, 0.5);
+  --text-main: #78350f;
+  --text-muted: #92400e;
+  --brand-primary: #d97706;
+  --brand-hover: #b45309;
+  --brand-glow: rgba(245, 158, 11, 0.35);
+  --key-bg: #ffffff;
+  --key-text: #78350f;
+  --key-border: #fcd34d;
+  --key-shadow: 0 4px 0 #f59e0b;
+  --key-active-shadow: 0 1px 0 #f59e0b;
+}
+
+/* 主題外觀：深海幽光水母 (Deep Ocean Aqua) - 萬米深海幽藍與水母青綠冷光 */
+body.theme-deepocean {
+  --bg-primary: #020617;
+  --bg-secondary: #081426;
+  --bg-card: rgba(10, 26, 48, 0.88);
+  --bg-card-hover: rgba(16, 40, 72, 0.98);
+  --border-color: rgba(6, 182, 212, 0.25);
+  --border-glow: rgba(6, 182, 212, 0.65);
+  --text-main: #ecfeff;
+  --text-muted: #67e8f9;
+  --brand-primary: #06b6d4;
+  --brand-hover: #0891b2;
+  --brand-glow: rgba(6, 182, 212, 0.45);
+  --key-bg: #0c233c;
+  --key-text: #ecfeff;
+  --key-border: #0891b2;
+  --key-shadow: 0 4px 0 #043653;
+  --key-active-shadow: 0 1px 0 #043653;
+}
+
+/* 主題外觀：皇家黑金榮耀 (Royal Sovereign Gold) - 曜石極黑與奢華香檳流金 */
+body.theme-gold {
+  --bg-primary: #0a0a08;
+  --bg-secondary: #161612;
+  --bg-card: rgba(28, 28, 22, 0.9);
+  --bg-card-hover: rgba(38, 38, 30, 1);
+  --border-color: rgba(234, 179, 8, 0.3);
+  --border-glow: rgba(234, 179, 8, 0.7);
+  --text-main: #fef9c3;
+  --text-muted: #fde047;
+  --brand-primary: #eab308;
+  --brand-hover: #ca8a04;
+  --brand-glow: rgba(234, 179, 8, 0.5);
+  --key-bg: #22221b;
+  --key-text: #fef08a;
+  --key-border: #ca8a04;
+  --key-shadow: 0 4px 0 #713f12;
+  --key-active-shadow: 0 1px 0 #713f12;
+}
+
 /* ==========================================================================
    全局重設與排版
    ========================================================================== */

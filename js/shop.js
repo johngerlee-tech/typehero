@@ -24,7 +24,11 @@ class ShopManager {
         { id: 'galaxy', name: '深空星幻紫', price: 450, preview: '🌌', desc: '神秘夢幻紫羅蘭，星空宇宙漫遊', themeClass: 'theme-galaxy' },
         { id: 'sunset', name: '暖陽金橘暮光', price: 500, preview: '🌅', desc: '溫暖朝氣的晚霞夕陽，熱情活力充沛', themeClass: 'theme-sunset' },
         { id: 'retro', name: '復古經典打字機', price: 600, preview: '📜', desc: '溫暖典雅羊皮紙，重回古典文豪時代', themeClass: 'theme-retro' },
-        { id: 'ice', name: '極地冰雪冰晶', price: 700, preview: '❄️', desc: '清涼晶瑩極地冰霜，透亮純淨極致爽快', themeClass: 'theme-ice' }
+        { id: 'ice', name: '極地冰雪冰晶', price: 700, preview: '❄️', desc: '清涼晶瑩極地冰霜，透亮純淨極致爽快', themeClass: 'theme-ice' },
+        { id: 'volcano', name: '熔岩黑曜戰魂', price: 750, preview: '🌋', desc: '熾熱赤紅流淌黑曜石岩盤，燃燒無畏鬥志', themeClass: 'theme-volcano' },
+        { id: 'honey', name: '蜜糖檸檬向日葵', price: 800, preview: '🌻', desc: '明亮燦爛陽光奶油黃，溫暖清新活力滿點', themeClass: 'theme-honey' },
+        { id: 'deepocean', name: '深海幽光水母', price: 850, preview: '🪼', desc: '萬米深海幽藍與水母青綠冷光，寧靜深邃的海洋奇景', themeClass: 'theme-deepocean' },
+        { id: 'gold', name: '皇家黑金榮耀', price: 900, preview: '⚜️', desc: '尊榮極黑搭配璀璨香檳流金，打字至尊巔峰榮譽', themeClass: 'theme-gold' }
       ],
       sounds: [
         { id: 'mechanical', name: 'Cherry MX 青軸', price: 0, preview: '⌨️', desc: '清脆有力的段落撞擊與彈簧餘音' },
@@ -34,18 +38,25 @@ class ShopManager {
         { id: 'waterdrop', name: '空靈清澈水滴', price: 320, preview: '💧', desc: '叮咚悅耳的空靈水滴聲，水潤純淨放鬆心靈' },
         { id: 'piano', name: '優雅鋼琴單音', price: 400, preview: '🎹', desc: '高雅純淨的清脆琴鍵聲' },
         { id: 'laser', name: '未來雷射光束', price: 480, preview: '⚡', desc: '充滿科技感的星際光束射擊，科幻打擊爽感十足' },
-        { id: 'chime', name: '夢幻水晶風鈴', price: 650, preview: '🔔', desc: '晶瑩剔透的八音盒風鈴，每一下敲擊如星塵滑落' }
+        { id: 'chime', name: '夢幻水晶風鈴', price: 650, preview: '🔔', desc: '晶瑩剔透的八音盒風鈴，每一下敲擊如星塵滑落' },
+        { id: 'guitar', name: '晨曦清脆木吉他', price: 700, preview: '🎸', desc: '溫暖動聽的尼龍弦撥弦聲，如同指尖彈奏民謠吉他' },
+        { id: 'drum', name: '搖滾節奏小軍鼓', price: 750, preview: '🥁', desc: '強勁俐落的金屬邊擊敲擊感，每一次擊鍵都充滿律動節奏' },
+        { id: 'gameboy', name: '奇幻冒險金幣跳', price: 800, preview: '🪙', desc: '萌趣歡快的雙音琶音跳躍音，宛如經典主機吃金幣冒險闖關' },
+        { id: 'thunder', name: '史詩雷霆重低音', price: 880, preview: '⚡', desc: '深沉震撼的次低頻能量衝擊，每一次敲擊都帶有萬鈞雷霆之威' }
       ],
       avatars: [
         { id: 'knight', name: '聖殿騎士', price: 0, preview: '🛡️', desc: '堅毅勇敢的鍵盤守護者，以絕對防禦守護打字準確率' },
         { id: 'warrior', name: '勇者劍士', price: 100, preview: '⚔️', desc: '熱血無畏的冒險先鋒，一往直前劈開字詞難關' },
         { id: 'archer', name: '精靈遊俠', price: 180, preview: '🏹', desc: '百步穿楊神射手，指尖出箭百發百中零失誤' },
         { id: 'mage', name: '元素法師', price: 260, preview: '🔮', desc: '掌控冰火奧術，鍵盤化作魔法杖施展疾風咒語' },
-        { id: 'ninja', name: '暗影忍者', price: 350, preview: '🥷', desc: '神出鬼沒疾風幻影，極速連擊瞬息破百WPM' },
-        { id: 'paladin', name: '光明聖騎', price: 450, preview: '⚜️', desc: '沐浴神聖榮光，堅毅不屈引領冒險團隊' },
-        { id: 'monk', name: '武道宗師', price: 550, preview: '🥋', desc: '拳掌生風心手合一，擊鍵如疾風驟雨行雲流水' },
-        { id: 'valkyrie', name: '天界女武神', price: 680, preview: '🪽', desc: '展翼翱翔九天，傳說中的勝利之翼神速無雙' },
-        { id: 'king', name: '傳奇帝王', price: 800, preview: '👑', desc: '加冕為王統治打字神殿，受萬千英雄景仰' }
+        { id: 'ninja', name: '暗影忍者', price: 340, preview: '🥷', desc: '神出鬼沒疾風幻影，極速連擊瞬息破百WPM' },
+        { id: 'bard', name: '吟遊詩人', price: 420, preview: '🪕', desc: '音律流淌心曠神怡，每一下擊鍵如撥弄優雅琴弦' },
+        { id: 'paladin', name: '光明聖騎', price: 500, preview: '⚜️', desc: '沐浴神聖榮光，堅毅不屈引領冒險團隊' },
+        { id: 'mechanic', name: '魔導工匠', price: 580, preview: '⚙️', desc: '精密齒輪與蒸汽動力，打造極致零容錯的機械打字核心' },
+        { id: 'monk', name: '武道宗師', price: 660, preview: '🥋', desc: '拳掌生風心手合一，擊鍵如疾風驟雨行雲流水' },
+        { id: 'berserker', name: '狂戰先鋒', price: 740, preview: '🪓', desc: '雙斧狂暴疾風破浪，以雷霆萬鈞之勢橫掃所有字詞難關' },
+        { id: 'valkyrie', name: '天界女武神', price: 820, preview: '🪽', desc: '展翼翱翔九天，傳說中的勝利之翼神速無雙' },
+        { id: 'king', name: '傳奇帝王', price: 900, preview: '👑', desc: '加冕為王統治打字神殿，受萬千英雄景仰' }
       ],
       pets: [
         { id: 'shiba', name: '元氣柴犬', price: 0, preview: '🐶', desc: '元氣滿滿搖尾巴，打字累了隨時為你加油打氣！' },
