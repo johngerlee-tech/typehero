@@ -1,12 +1,20 @@
 /**
  * TypeHero 虛擬幣經濟、等級成就與外觀商城模組
  * 負責金幣（Star Coins）、經驗值、軍階計算、背包解鎖狀態與樣式套用
+ * 支援依「班級_座號」分帳號獨立保存，防止換座號時繼承或污染前人資料
  */
 
 class ShopManager {
   constructor() {
     this.storageKey = 'typehero_player_data';
-    this.data = this.loadData();
+    this.currentStudentId = null;
+
+    // 若本地已有現行學生身份，自動綁定至該帳號
+    if (window.cloudSync && window.cloudSync.profile && window.cloudSync.profile.className && window.cloudSync.profile.seatNumber) {
+      this.currentStudentId = `${window.cloudSync.profile.className}_${window.cloudSync.profile.seatNumber}`;
+    }
+
+    this.data = this.loadData(this.currentStudentId);
     this.catalog = {
       skins: [
         { id: 'default', name: '活力科技深藍', price: 0, preview: '💻', desc: '經典電競深藍配色，護眼清晰', themeClass: '' },
@@ -47,17 +55,10 @@ class ShopManager {
     }
   }
 
-  loadData() {
-    const raw = localStorage.getItem(this.storageKey);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        parsed.unlockedAchievements = parsed.unlockedAchievements || [];
-        return parsed;
-      } catch (e) {
-        console.error('讀取存檔失敗，重設存檔');
-      }
-    }
+  /**
+   * 取得乾淨的初始新帳號資料結構
+   */
+  getDefaultPlayerData() {
     return {
       coins: 100, // 新手開學見面禮 100 幣
       exp: 0,
@@ -73,7 +74,90 @@ class ShopManager {
     };
   }
 
+  /**
+   * 依據學生識別碼取得專屬的 localStorage 鍵名
+   */
+  getStorageKey(studentId = this.currentStudentId) {
+    if (studentId) {
+      return `typehero_player_data_${studentId}`;
+    }
+    return this.storageKey;
+  }
+
+  /**
+   * 讀取存檔（優先讀取學生獨立存檔）
+   */
+  loadData(studentId = null) {
+    const key = this.getStorageKey(studentId);
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        parsed.unlockedAchievements = Array.isArray(parsed.unlockedAchievements) ? parsed.unlockedAchievements : [];
+        parsed.lessonStars = (parsed.lessonStars && typeof parsed.lessonStars === 'object') ? parsed.lessonStars : {};
+        parsed.unlockedSkins = Array.isArray(parsed.unlockedSkins) && parsed.unlockedSkins.length ? parsed.unlockedSkins : ['default'];
+        parsed.unlockedSounds = Array.isArray(parsed.unlockedSounds) && parsed.unlockedSounds.length ? parsed.unlockedSounds : ['mechanical'];
+        parsed.unlockedAvatars = Array.isArray(parsed.unlockedAvatars) && parsed.unlockedAvatars.length ? parsed.unlockedAvatars : ['cat'];
+        parsed.coins = Number(parsed.coins) >= 0 ? Number(parsed.coins) : 100;
+        parsed.exp = Number(parsed.exp) >= 0 ? Number(parsed.exp) : 0;
+        parsed.level = Number(parsed.level) >= 1 ? Number(parsed.level) : 1;
+        parsed.equippedSkin = parsed.equippedSkin || 'default';
+        parsed.equippedSound = parsed.equippedSound || 'mechanical';
+        parsed.equippedAvatar = parsed.equippedAvatar || 'cat';
+        return parsed;
+      } catch (e) {
+        console.error('讀取存檔失敗，使用初始設定:', e);
+      }
+    }
+    return this.getDefaultPlayerData();
+  }
+
+  /**
+   * 重設為乾淨的新帳號模式（新座號首次登入時調用）
+   */
+  resetToDefault(studentId) {
+    this.currentStudentId = studentId || null;
+    this.data = this.getDefaultPlayerData();
+    const key = this.getStorageKey(studentId);
+    localStorage.setItem(key, JSON.stringify(this.data));
+    localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+    
+    this.applySkin(this.data.equippedSkin);
+    if (window.soundEngine) {
+      window.soundEngine.setSoundPack(this.data.equippedSound);
+    }
+    this.updateUI();
+    console.log(`✨ 已為學生 [${studentId || '新帳號'}] 初始化乾淨的新帳號資料（等級1、100金幣、零進度）`);
+  }
+
+  /**
+   * 切換學生帳號並載入該學生專屬進度（換電腦或換座號時調用）
+   */
+  switchToStudent(studentId, cloudData = null) {
+    this.currentStudentId = studentId;
+    if (cloudData) {
+      // 來自雲端漫遊資料：完全以該座號的雲端存檔還原，絕對不與本機前一學生資料混雜
+      this.restoreFromCloud(cloudData);
+    } else {
+      // 離線或無雲端快照：檢查本機是否有此學生的專屬快取
+      const key = this.getStorageKey(studentId);
+      if (localStorage.getItem(key)) {
+        this.data = this.loadData(studentId);
+        this.applySkin(this.data.equippedSkin);
+        if (window.soundEngine) {
+          window.soundEngine.setSoundPack(this.data.equippedSound);
+        }
+        this.updateUI();
+      } else {
+        // 全新學生：乾淨新帳號
+        this.resetToDefault(studentId);
+      }
+    }
+  }
+
   saveData(syncCloud = true) {
+    const studentKey = this.getStorageKey();
+    localStorage.setItem(studentKey, JSON.stringify(this.data));
     localStorage.setItem(this.storageKey, JSON.stringify(this.data));
     this.updateUI();
 
@@ -84,50 +168,66 @@ class ShopManager {
   }
 
   /**
-   * 自雲端漫遊還原學生進度（換電腦登入時觸發）
+   * 自雲端漫遊還原學生進度（以雲端該帳號為唯一真實來源，徹底隔絕不同座號間的資料污染）
    */
   restoreFromCloud(cloudData) {
     if (!cloudData) return;
 
-    // 1. 金幣與經驗值（合併雲端紀錄，取較優值）
+    // 1. 金幣與經驗值（完全依據雲端存檔還原）
     const cloudCoins = Number(cloudData.coins);
-    if (!isNaN(cloudCoins)) {
-      this.data.coins = Math.max(this.data.coins || 0, cloudCoins);
-    }
+    const coins = (!isNaN(cloudCoins) && cloudCoins >= 0) ? cloudCoins : 100;
 
     const cloudExp = Number(cloudData.exp);
-    if (!isNaN(cloudExp)) {
-      this.data.exp = Math.max(this.data.exp || 0, cloudExp);
-      this.data.level = Math.floor(this.data.exp / 200) + 1;
-    }
+    const exp = (!isNaN(cloudExp) && cloudExp >= 0) ? cloudExp : 0;
+    const level = Number(cloudData.level) >= 1 ? Number(cloudData.level) : (Math.floor(exp / 200) + 1);
 
-    // 2. 關卡星等 (合併本地與雲端，保留最高星數)
-    const localStars = this.data.lessonStars || {};
-    const cloudStars = cloudData.lessonStars || {};
-    const mergedStars = { ...localStars };
-    for (const [id, stars] of Object.entries(cloudStars)) {
-      mergedStars[id] = Math.max(mergedStars[id] || 0, Number(stars) || 0);
-    }
-    this.data.lessonStars = mergedStars;
+    // 2. 關卡星等（完全以該座號雲端存檔為準）
+    const lessonStars = (cloudData.lessonStars && typeof cloudData.lessonStars === 'object')
+      ? { ...cloudData.lessonStars }
+      : {};
 
-    // 3. 背包解鎖清單 (聯集不重複)
-    const mergeArrays = (arr1, arr2) => Array.from(new Set([...(arr1 || []), ...(arr2 || [])]));
-    this.data.unlockedSkins = mergeArrays(this.data.unlockedSkins, cloudData.unlockedSkins);
-    this.data.unlockedSounds = mergeArrays(this.data.unlockedSounds, cloudData.unlockedSounds);
-    this.data.unlockedAvatars = mergeArrays(this.data.unlockedAvatars, cloudData.unlockedAvatars);
+    // 3. 背包解鎖清單（確保預設項目存在）
+    const unlockedSkins = Array.isArray(cloudData.unlockedSkins) && cloudData.unlockedSkins.length
+      ? Array.from(new Set(['default', ...cloudData.unlockedSkins]))
+      : ['default'];
+    const unlockedSounds = Array.isArray(cloudData.unlockedSounds) && cloudData.unlockedSounds.length
+      ? Array.from(new Set(['mechanical', ...cloudData.unlockedSounds]))
+      : ['mechanical'];
+    const unlockedAvatars = Array.isArray(cloudData.unlockedAvatars) && cloudData.unlockedAvatars.length
+      ? Array.from(new Set(['cat', ...cloudData.unlockedAvatars]))
+      : ['cat'];
 
-    // 4. 裝備狀態 (以雲端紀錄為主)
-    if (cloudData.equippedSkin && this.data.unlockedSkins.includes(cloudData.equippedSkin)) {
-      this.data.equippedSkin = cloudData.equippedSkin;
-    }
-    if (cloudData.equippedSound && this.data.unlockedSounds.includes(cloudData.equippedSound)) {
-      this.data.equippedSound = cloudData.equippedSound;
-    }
-    if (cloudData.equippedAvatar && this.data.unlockedAvatars.includes(cloudData.equippedAvatar)) {
-      this.data.equippedAvatar = cloudData.equippedAvatar;
-    }
+    // 4. 成就解鎖清單
+    const unlockedAchievements = Array.isArray(cloudData.unlockedAchievements)
+      ? [...cloudData.unlockedAchievements]
+      : [];
 
-    // 寫入本機快取（不重複上傳避免無窮迴圈）
+    // 5. 裝備狀態（驗證合法性）
+    let equippedSkin = cloudData.equippedSkin || 'default';
+    if (!unlockedSkins.includes(equippedSkin)) equippedSkin = 'default';
+
+    let equippedSound = cloudData.equippedSound || 'mechanical';
+    if (!unlockedSounds.includes(equippedSound)) equippedSound = 'mechanical';
+
+    let equippedAvatar = cloudData.equippedAvatar || 'cat';
+    if (!unlockedAvatars.includes(equippedAvatar)) equippedAvatar = 'cat';
+
+    // 完整重設該學生的資料結構
+    this.data = {
+      coins,
+      exp,
+      level,
+      lessonStars,
+      unlockedSkins,
+      equippedSkin,
+      unlockedSounds,
+      equippedSound,
+      unlockedAvatars,
+      equippedAvatar,
+      unlockedAchievements
+    };
+
+    // 寫入學生專屬本機快取與通用快取（不重複上傳避免無窮迴圈）
     this.saveData(false);
 
     // 套用外觀、音效與畫面

@@ -154,16 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.cloudSync) {
     window.cloudSync.populateClassSelects();
     window.cloudSync.updateProfileBadgeUI();
-
-    // 背景自雲端還原（若本機已有註冊學生身分）
-    const curP = window.cloudSync.profile;
-    if (curP && curP.hasRegistered && curP.className && curP.seatNumber) {
-      window.cloudSync.loadProfileFromCloud(curP.className, curP.seatNumber).then(cloudData => {
-        if (cloudData && gameState.currentCategory && window.COURSES) {
-          renderLessonsGrid(window.COURSES[gameState.currentCategory]);
-        }
-      });
-    }
   }
 
   // 需求 6: 全螢幕練習按鈕綁定
@@ -209,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nameInp = document.getElementById('login-name-input');
     const classSel = document.getElementById('login-class-select');
     const passInp = document.getElementById('login-password-input');
-    if (seatInp) seatInp.value = (p && p.seatNumber) ? p.seatNumber : '';
+    if (seatInp) seatInp.value = '';
     // 需求 1: 預設為空白，無暱稱時留空顯示「請設定您的暱稱」placeholder
     if (nameInp) nameInp.value = '';
     // 需求: 網頁載入🏫 選擇所屬班級 可停留在"=選擇班級="
@@ -1980,9 +1970,15 @@ function initModals() {
 
   window.openStudentLoginModal = function() {
     if (loginClassSel) loginClassSel.value = '';
+    if (loginSeatInp) loginSeatInp.value = '';
+    if (loginNameInp) loginNameInp.value = '';
+    if (loginPassInp) loginPassInp.value = '';
     if (loginPassError) loginPassError.style.display = 'none';
     updateClassPasscodeVisibility('');
     if (loginModal) loginModal.classList.add('active');
+    setTimeout(() => {
+      if (loginClassSel) loginClassSel.focus();
+    }, 100);
   };
 
   if (loginForm) {
@@ -2053,17 +2049,20 @@ function initModals() {
 
         window.cloudSync.saveProfile(selClass, seatVal, nameVal, passVal);
 
-        if (cloudRes && cloudRes.data) {
-          const cloudData = cloudRes.data;
-          // 若有輸入新暱稱，同步更新到雲端
-          if (nameVal && nameVal !== cloudData.nickname) {
-            window.cloudSync.profile.nickname = nameVal;
-            window.cloudSync.syncProfileToCloud();
-          }
-          // 重新整理關卡地圖卡片的解鎖狀態（根據雲端星星解鎖關卡）
-          if (gameState.currentCategory && window.COURSES) {
-            renderLessonsGrid(window.COURSES[gameState.currentCategory]);
-          }
+        // 若有輸入自訂暱稱，確保同步至雲端個人存檔
+        if (nameVal && window.cloudSync.profile) {
+          window.cloudSync.profile.nickname = nameVal;
+          await window.cloudSync.syncProfileToCloud();
+        }
+
+        // 不論新帳號或還原帳號，立即重新整理關卡地圖卡片的解鎖與星星狀態
+        if (gameState.currentCategory && window.COURSES && typeof renderLessonsGrid === 'function') {
+          renderLessonsGrid(window.COURSES[gameState.currentCategory]);
+        }
+
+        // 重新整理成就勳章牆
+        if (typeof renderAchievements === 'function') {
+          renderAchievements();
         }
       }
       if (window.shopManager) {

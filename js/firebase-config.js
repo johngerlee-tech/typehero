@@ -146,27 +146,47 @@ class CloudSyncManager {
     this.updateProfileBadgeUI();
   }
 
+  logoutStudent() {
+    this.profile = {
+      className: '',
+      seatNumber: '',
+      nickname: '',
+      password: '',
+      hasRegistered: false
+    };
+    localStorage.removeItem(this.storageKey);
+    this.updateProfileBadgeUI();
+  }
+
   updateProfileBadgeUI() {
     const titleEl = document.getElementById('user-title-display');
     const badgeEl = document.getElementById('user-profile-badge');
     const tagEl = document.getElementById('user-student-tag');
     const nameEl = document.getElementById('user-name-display');
 
-    if (tagEl && this.profile) {
+    if (!this.profile || !this.profile.hasRegistered) {
+      if (tagEl) tagEl.innerText = '未登入';
+      if (nameEl) nameEl.innerText = '';
+      if (titleEl && !window.shopManager) titleEl.innerText = '鍵盤學徒';
+      if (badgeEl) badgeEl.title = '尚未登入學生帳號，點擊可立即登入';
+      return;
+    }
+
+    if (tagEl) {
       tagEl.innerText = `${this.profile.className} ${this.profile.seatNumber}號`;
     }
-    if (nameEl && this.profile) {
+    if (nameEl) {
       const displayName = this.profile.nickname || (this.profile.realName ? `${this.profile.realName}` : '');
       nameEl.innerText = displayName;
     }
-    if (titleEl && this.profile && !window.shopManager) {
+    if (titleEl && !window.shopManager) {
       titleEl.innerText = this.profile.nickname || (this.profile.realName ? `${this.profile.realName}` : '鍵盤學徒');
     }
-    if (badgeEl && this.profile) {
+    if (badgeEl) {
       const namePart = this.profile.realName ? ` (${this.profile.realName})` : '';
       const nickPart = this.profile.nickname ? ` · 暱稱: ${this.profile.nickname}` : '';
       const noPart = this.profile.studentNo ? ` · 學號: ${this.profile.studentNo}` : '';
-      badgeEl.title = `目前學生：${this.profile.className} ${this.profile.seatNumber}號${namePart}${nickPart}${noPart} (點擊可修改暱稱與密碼)`;
+      badgeEl.title = `目前學生：${this.profile.className} ${this.profile.seatNumber}號${namePart}${nickPart}${noPart} (點擊可修改暱稱、密碼或登出)`;
     }
   }
 
@@ -640,10 +660,23 @@ class CloudSyncManager {
   // 雙向雲端漫遊核心：拉取學生雲端存檔 (換電腦時自動還原 & 密碼驗證)
   // ==========================================
   async loadProfileFromCloud(className, seatNumber, inputPassword) {
-    if (!this.isFirebaseReady || !this.db) return { success: true, localOnly: true };
     if (!className || !seatNumber) return { success: false, reason: '缺少班級或座號' };
-
     const studentId = `${className}_${seatNumber}`;
+
+    // 離線或 Firebase 尚未就緒時的安全切換
+    if (!this.isFirebaseReady || !this.db) {
+      this.profile.className = className;
+      this.profile.seatNumber = seatNumber;
+      this.profile.hasRegistered = true;
+      if (inputPassword) this.profile.password = String(inputPassword).trim();
+      localStorage.setItem(this.storageKey, JSON.stringify(this.profile));
+      this.updateProfileBadgeUI();
+      if (window.shopManager) {
+        window.shopManager.switchToStudent(studentId, null);
+      }
+      return { success: true, localOnly: true };
+    }
+
     try {
       console.log(`🔍 正在為 [${studentId}] 查詢雲端進度...`);
       const docSnap = await this.db.collection('students').doc(studentId).get();
@@ -692,22 +725,37 @@ class CloudSyncManager {
           }, { merge: true });
         }
 
-        // 2. 還原 ShopManager 經濟與裝備進度
+        // 2. 還原 ShopManager 經濟、成就與裝備進度（切換至該座號，徹底防止前一帳號資料污染）
         if (window.shopManager) {
-          window.shopManager.restoreFromCloud(cloudData);
+          window.shopManager.switchToStudent(studentId, cloudData);
         }
 
         // 3. 顯示漫遊成功視覺提示
         const displayName = this.profile.nickname || this.profile.realName || `${className} ${seatNumber}號`;
-        this.showToast(`☁️ 歡迎回來！已自雲端漫遊還原【${displayName}】的進度（Lv.${cloudData.level || 1} · ${cloudData.coins || 0} 星幣）`, 'success');
+        this.showToast(`☁️ 歡迎回來！已自雲端漫遊還原【${displayName}】的專屬進度（Lv.${cloudData.level || 1} · ${cloudData.coins || 0} 星幣）`, 'success');
         return { success: true, data: cloudData };
       } else {
-        console.log(`ℹ️ 雲端尚無 [${studentId}] 的歷史進度，將以目前本機設定初始化雲端存檔。`);
-        // 新座號首次使用，將現有基礎檔案註冊上傳，並綁定密碼
+        console.log(`ℹ️ 雲端尚無 [${studentId}] 的歷史進度，初始化全新乾淨新帳號模式...`);
+        // 新座號首次使用：註冊基本身份
+        this.profile.className = className;
+        this.profile.seatNumber = seatNumber;
+        this.profile.hasRegistered = true;
         if (inputPassword) {
           this.profile.password = String(inputPassword).trim();
         }
+        localStorage.setItem(this.storageKey, JSON.stringify(this.profile));
+        this.updateProfileBadgeUI();
+
+        // 關鍵修復：重設為全新乾淨的新帳號模式（Lv.1、0經驗、100金幣新手禮、零關卡星數、零成就、預設外觀）
+        if (window.shopManager) {
+          window.shopManager.resetToDefault(studentId);
+        }
+
+        // 將乾淨的新帳號存檔同步建立於雲端
         await this.syncProfileToCloud();
+
+        const displayName = this.profile.nickname || this.profile.realName || `${className} ${seatNumber}號`;
+        this.showToast(`🎉 歡迎【${displayName}】加入打字冒險學院！已為您開通全新專屬帳號（贈送新手啟動禮 100 星幣）！`, 'success');
         return { success: true, isNew: true };
       }
     } catch (e) {
@@ -737,7 +785,7 @@ class CloudSyncManager {
         password: this.profile.password || '',
         level: Number(playerData.level) || 1,
         exp: Number(playerData.exp) || 0,
-        coins: Number(playerData.coins) || 0,
+        coins: Number(playerData.coins) >= 0 ? Number(playerData.coins) : 100,
         equippedSkin: playerData.equippedSkin || 'default',
         equippedSound: playerData.equippedSound || 'mechanical',
         equippedAvatar: playerData.equippedAvatar || 'cat',
@@ -745,11 +793,12 @@ class CloudSyncManager {
         unlockedSounds: playerData.unlockedSounds || ['mechanical'],
         unlockedAvatars: playerData.unlockedAvatars || ['cat'],
         lessonStars: playerData.lessonStars || {},
+        unlockedAchievements: playerData.unlockedAchievements || [],
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
 
       await this.db.collection('students').doc(studentId).set(payload, { merge: true });
-      console.log(`☁️ 學生 [${studentId}] 雲端個人存檔已同步完成！`);
+      console.log(`☁️ 學生 [${studentId}] 雲端個人存檔已同步完成（含等級、經驗、星幣、裝備、成就）！`);
       return true;
     } catch (e) {
       console.error('雲端存檔同步失敗:', e);
