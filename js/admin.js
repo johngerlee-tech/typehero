@@ -39,6 +39,23 @@ document.addEventListener('DOMContentLoaded', () => {
     window.cloudSync.populateClassSelects();
   }
 
+  // 需求 1: 返回打字學院超連結處理 (target="_Parent"，若由前台打字頁開啟新分頁則自動聚焦原視窗並關閉本管理頁，避免重複多開)
+  const returnLinks = document.querySelectorAll('a[href="index.html"]');
+  returnLinks.forEach(link => {
+    link.setAttribute('target', '_Parent');
+    link.addEventListener('click', (e) => {
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.focus();
+          window.close();
+          e.preventDefault();
+        } catch (err) {
+          // 若無法 close，則依預設 target="_Parent" 導向原頁面
+        }
+      }
+    });
+  });
+
   // =========================================================================
   // 1. 身分驗證模組 (Google Auth 教師登入 & 最高管理員密碼登入)
   // =========================================================================

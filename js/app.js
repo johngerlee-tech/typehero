@@ -203,21 +203,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 頂部導航列雲端狀態徽章為指示燈（無超連結按鈕）
 
-  // 載入首頁先跳出學生班級、座號與姓名登載彈窗
+  // 需求 2: 重新整理打字頁面時，若學生已登入則保持登入狀態，不重複彈出登入畫面
+  const curP = window.cloudSync ? window.cloudSync.profile : null;
+  const isStudentLoggedIn = Boolean(
+    curP &&
+    curP.hasRegistered &&
+    curP.className &&
+    curP.seatNumber !== undefined &&
+    curP.seatNumber !== null &&
+    String(curP.seatNumber).trim() !== ''
+  );
   const loginModal = document.getElementById('modal-student-login');
-  if (loginModal) {
+
+  if (!isStudentLoggedIn && loginModal) {
+    // 尚未登入學生身份時，才自動彈出登入登記彈窗
     loginModal.classList.add('active');
-    const p = window.cloudSync ? window.cloudSync.profile : null;
     const seatInp = document.getElementById('login-seat-input');
     const nameInp = document.getElementById('login-name-input');
     const classSel = document.getElementById('login-class-select');
     const passInp = document.getElementById('login-password-input');
     if (seatInp) seatInp.value = '';
-    // 需求 1: 預設為空白，無暱稱時留空顯示「請設定您的暱稱」placeholder
     if (nameInp) nameInp.value = '';
-    // 需求: 網頁載入🏫 選擇所屬班級 可停留在"=選擇班級="
     if (classSel) classSel.value = '';
     if (passInp) passInp.value = '';
+  } else if (isStudentLoggedIn) {
+    // 已登入（網頁重新整理 F5）：確保登入彈窗隱藏，並即時更新身分與商城裝備 UI
+    if (loginModal) loginModal.classList.remove('active');
+    if (window.cloudSync && typeof window.cloudSync.updateProfileBadgeUI === 'function') {
+      window.cloudSync.updateProfileBadgeUI();
+    }
+    if (window.shopManager && typeof window.shopManager.updateUI === 'function') {
+      window.shopManager.updateUI();
+    }
   }
 
   // 點擊舞台聚焦真實輸入框
