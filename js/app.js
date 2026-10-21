@@ -109,8 +109,21 @@ const FINGER_INFO = {
   'RP': { hand: '右手', finger: '小指', en: 'Right Pinky', color: '#f43f5e', glow: 'rgba(244, 63, 94, 0.45)', icon: '👉', homeKey: ';' }
 };
 
-// 通關門檻標準：擊鍵準確率需達 70% 以上
-const PASS_ACCURACY_THRESHOLD = 70;
+// 通關門檻標準：擊鍵準確率 (可由管理者後台調整，預設 70%)
+function getPassAccuracyThreshold() {
+  if (window.cloudSync && typeof window.cloudSync.getPassAccuracy === 'function') {
+    return window.cloudSync.getPassAccuracy();
+  }
+  const saved = localStorage.getItem('typehero_pass_accuracy');
+  const num = parseInt(saved, 10);
+  return (!isNaN(num) && num >= 30 && num <= 100) ? num : 70;
+}
+
+window.updatePassAccuracyUI = function(customVal) {
+  const val = (typeof customVal === 'number') ? customVal : getPassAccuracyThreshold();
+  const tipVal = document.getElementById('pass-acc-tip-val');
+  if (tipVal) tipVal.innerText = val;
+};
 
 // 全域遊戲狀態
 let gameState = {
@@ -173,6 +186,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.cloudSync) {
     window.cloudSync.populateClassSelects();
     window.cloudSync.updateProfileBadgeUI();
+  }
+
+  // 初始化關卡通關標準指示
+  if (typeof window.updatePassAccuracyUI === 'function') {
+    window.updatePassAccuracyUI();
   }
 
   // 需求 6: 全螢幕練習按鈕綁定
@@ -1879,7 +1897,7 @@ function finishLesson() {
 
     feedbackEl.className = 'modal-feedback-msg modal-feedback-fail';
     feedbackEl.innerHTML = `
-      ⚠️ <strong>未達通關標準（門檻需 70%）</strong><br>
+      ⚠️ <strong>未達通關標準（門檻需 ${passThreshold}%）</strong><br>
       本關準確率為 <strong>${finalAcc}%</strong>。請放慢打字速度，不要著急亂按，抬頭專注看著螢幕上的發光手指指引，再試一次吧！
     `;
 

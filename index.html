@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
-  <link rel="stylesheet" href="css/styles.css?v=2.9.2">
+  <link rel="stylesheet" href="css/styles.css?v=2.9.3">
   
   <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -102,8 +102,14 @@
   <!-- 主畫面區域 -->
   <main>
 
-    <!-- 課程分類分頁標籤 (Tabs) -->
+    <!-- 課程分類分頁標籤 (Tabs) 與 通關標準提示 -->
     <div class="course-tabs-wrapper">
+      <!-- 位於分類左側：通關標準提示 (動態同步後台設定，節省垂直空間) -->
+      <div class="course-pass-tip" id="course-pass-tip" title="通關標準：可在管理者後台調整設定值">
+        <span>💡 準確率需達 <strong id="pass-acc-tip-val">70</strong>% 即可通關</span>
+      </div>
+
+      <!-- 分類及排行往右靠 -->
       <div class="course-tabs">
         <button class="course-tab-btn active" data-category="zhuyin">
           <span style="font-weight:900;">ㄅ</span> 注音符號與聲調盲打
@@ -114,10 +120,10 @@
         <button class="course-tab-btn" data-category="english">
           <span>🔤</span> 國小英語標準盲打
         </button>
-        <!-- 自訂特訓分頁 (不斷行、純分班特訓、預設選擇班級、無星星圖案) -->
+        <!-- 自訂特訓分頁 (加圖案 🎯 較明顯、純分班特訓、預設選擇班級) -->
         <div class="custom-tab-container" id="custom-tab-container" style="display:inline-flex; align-items:center; gap:6px;">
           <button class="course-tab-btn" id="tab-custom-lesson" data-category="custom" style="padding:0.45rem 0.85rem;">
-            自訂特訓
+            <span>🎯</span> 自訂特訓
           </button>
           <select id="custom-lesson-class-select" class="custom-class-dropdown" title="選擇欲練習的班級特訓題目">
             <option value="" disabled selected>選擇班級</option>
@@ -128,11 +134,6 @@
           </select>
         </div>
       </div>
-    </div>
-
-    <!-- 獨立換行秘訣提示列 (不與第一排分類排在同一行，避免擠壓版面) -->
-    <div class="course-tip-banner" id="course-tip-banner">
-      <span>💡 秘訣：打中文時可切換「注音輸入法」做選字練習；注音與英文盲打直接敲擊實體鍵！準確率需達 70% 即可通關！</span>
     </div>
 
     <!-- 核心兩欄並列工作台 (左側 240px 側邊儀表板 + 右側 打字舞台與虛擬鍵盤，單屏無滾動！) -->
@@ -891,7 +892,7 @@
   <script src="js/audio.js?v=3.2.0"></script>
   <script src="js/lessons.js?v=2.5.2"></script>
   <script src="js/shop.js?v=3.2.0"></script>
-  <script src="js/firebase-config.js?v=3.3.0"></script>
-  <script src="js/app.js?v=3.3.0"></script>
+  <script src="js/firebase-config.js?v=3.3.1"></script>
+  <script src="js/app.js?v=3.3.1"></script>
 </body>
 </html>

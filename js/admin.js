@@ -228,12 +228,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // 依據角色套用權限限制 (需求 7: 教師不能修改班級名稱、不能清空紀錄)
     applyRolePermissions(adminRole);
 
-    // 載入資料庫診斷、特訓題目與名冊
+    // 載入資料庫診斷、特訓題目、通關門檻與名冊
     runFirebaseDiagnostic();
     loadPublishedLessonsList();
     renderAdminLeaderboard();
     renderClassTags();
     loadStudentsRoster();
+    refreshPassAccuracyUI();
 
     // 需求 4: 介面載入時即自動在背景進行既有資料與真實姓名綁定
     autoSyncRosterOnLoad();
@@ -1468,6 +1469,80 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
   }
+
+  // =========================================================================
+  // 6. 全校挑戰關卡通關準確率門檻設定 (Card: 通過率可在管理者後台調整設定值)
+  // =========================================================================
+  const passAccInput = document.getElementById('admin-pass-accuracy-input');
+  const savePassAccBtn = document.getElementById('admin-btn-save-pass-accuracy');
+  const passAccHint = document.getElementById('admin-current-pass-accuracy-hint');
+  const presetAccBtns = document.querySelectorAll('.btn-preset-acc');
+
+  function refreshPassAccuracyUI() {
+    const currentAcc = (window.cloudSync && typeof window.cloudSync.getPassAccuracy === 'function')
+      ? window.cloudSync.getPassAccuracy()
+      : 70;
+    if (passAccInput) passAccInput.value = currentAcc;
+    if (passAccHint) passAccHint.innerText = `${currentAcc}%`;
+
+    if (presetAccBtns) {
+      presetAccBtns.forEach(btn => {
+        const isMatch = (parseInt(btn.dataset.val, 10) === currentAcc);
+        btn.style.borderColor = isMatch ? '#10b981' : '';
+        btn.style.color = isMatch ? '#34d399' : '';
+      });
+    }
+  }
+
+  if (presetAccBtns && presetAccBtns.length > 0) {
+    presetAccBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.val;
+        if (passAccInput) {
+          passAccInput.value = val;
+          presetAccBtns.forEach(b => {
+            b.style.borderColor = (b === btn) ? '#10b981' : '';
+            b.style.color = (b === btn) ? '#34d399' : '';
+          });
+        }
+      });
+    });
+  }
+
+  if (savePassAccBtn && passAccInput) {
+    savePassAccBtn.addEventListener('click', async () => {
+      const val = parseInt(passAccInput.value, 10);
+      if (isNaN(val) || val < 30 || val > 100) {
+        alert('⚠️ 請輸入有效的準確率門檻數值（介於 30% 到 100% 之間）！');
+        passAccInput.focus();
+        return;
+      }
+      savePassAccBtn.disabled = true;
+      savePassAccBtn.innerText = '⏳ 儲存中...';
+      try {
+        if (window.cloudSync && typeof window.cloudSync.savePassAccuracy === 'function') {
+          await window.cloudSync.savePassAccuracy(val);
+        } else {
+          localStorage.setItem('typehero_pass_accuracy', String(val));
+        }
+        refreshPassAccuracyUI();
+        if (window.cloudSync && typeof window.cloudSync.showToast === 'function') {
+          window.cloudSync.showToast(`✅ 全校關卡通關準確率門檻已成功設定為：${val}%！`, 'success');
+        } else {
+          alert(`✅ 全校關卡通關準確率門檻已成功設定為：${val}%！\n首頁提示與學生關卡挑戰結算將立即依此標準判定。`);
+        }
+      } catch (err) {
+        console.error('儲存通關門檻失敗:', err);
+        alert('❌ 儲存失敗，請檢查網路或 Firebase 連線！');
+      } finally {
+        savePassAccBtn.disabled = false;
+        savePassAccBtn.innerText = '💾 儲存通關門檻';
+      }
+    });
+  }
+
+  // 立即初始化顯示目前的通關門檻
+  refreshPassAccuracyUI();
 
   // =========================================================================
   // 7. 學年度編班名冊與學生資產升級移轉精靈 (Card 6)

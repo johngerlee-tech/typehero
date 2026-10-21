@@ -44,6 +44,7 @@ class CloudSyncManager {
     this.adminPasswordKey = 'typehero_admin_password';
     this.teacherPasscodeKey = 'typehero_teacher_passcode';
     this.classPasscodesKey = 'typehero_class_passcodes';
+    this.passAccuracyKey = 'typehero_pass_accuracy';
 
     this.profile = this.loadProfile();
     this.classList = this.loadClassList();
@@ -62,6 +63,35 @@ class CloudSyncManager {
   // ==========================================
   getAdminPassword() {
     return localStorage.getItem(this.adminPasswordKey) || '1234';
+  }
+
+  // ==========================================
+  // 全校挑戰關卡通關準確率門檻機制 (預設 70%)
+  // ==========================================
+  getPassAccuracy() {
+    const stored = localStorage.getItem(this.passAccuracyKey);
+    const num = parseInt(stored, 10);
+    if (!isNaN(num) && num >= 30 && num <= 100) {
+      return num;
+    }
+    return 70; // 預設 70%
+  }
+
+  async savePassAccuracy(newVal) {
+    const num = Math.max(30, Math.min(100, parseInt(newVal, 10) || 70));
+    localStorage.setItem(this.passAccuracyKey, String(num));
+    if (this.isFirebaseReady && this.db) {
+      try {
+        await this.db.collection('config').doc('school_config').set({
+          passAccuracy: num,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log(`☁️ 全校關卡通關門檻已同步至雲端: [${num}%]`);
+      } catch (err) {
+        console.error('儲存通關門檻至雲端失敗:', err);
+      }
+    }
+    return num;
   }
 
   // 本校教師註冊與授權通關密碼機制 (預設 TK6341106)
@@ -679,12 +709,20 @@ class CloudSyncManager {
           this.classPasscodes = Object.assign({}, this.loadClassPasscodes(), data.classPasscodes);
           localStorage.setItem(this.classPasscodesKey, JSON.stringify(this.classPasscodes));
         }
+        if (typeof data.passAccuracy === 'number' || (data.passAccuracy && !isNaN(Number(data.passAccuracy)))) {
+          const acc = Math.max(30, Math.min(100, Number(data.passAccuracy)));
+          localStorage.setItem(this.passAccuracyKey, String(acc));
+          if (typeof window.updatePassAccuracyUI === 'function') {
+            window.updatePassAccuracyUI(acc);
+          }
+        }
       } else {
         // 雲端首次執行，自動寫入預設班級清單與預設密碼建立 school_config
         await this.db.collection('config').doc('school_config').set({
           classList: this.classList,
           adminPassword: this.getAdminPassword(),
           teacherPasscode: this.getTeacherPasscode(),
+          passAccuracy: this.getPassAccuracy(),
           schoolName: '溪洲國小',
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()

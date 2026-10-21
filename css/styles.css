@@ -620,34 +620,47 @@ main {
   gap: 1.25rem;
 }
 
-/* 課程導航分類籤 (Tabs: 注音盲打 / 中文標點詞彙 / 國小英文) */
+/* 課程導航分類籤 (Tabs) 與 通關標準提示 */
 .course-tabs-wrapper {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   width: 100%;
+  gap: 0.75rem;
   overflow-x: auto;
   scrollbar-width: none;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.65rem;
 }
 .course-tabs-wrapper::-webkit-scrollbar {
   display: none;
 }
 
-/* 獨立換行秘訣提示列 (不與分類按鈕擠在同一行) */
-.course-tip-banner {
-  display: flex;
+/* 關卡準確率通關標準提示標籤 (置於分類左側，節省版面空間) */
+.course-pass-tip {
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.78rem;
+  gap: 0.35rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
-  line-height: 1.4;
-  padding: 0.15rem 0.2rem;
-  margin-bottom: 0.65rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0.35rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  letter-spacing: 0.2px;
+}
+.course-pass-tip strong,
+.course-pass-tip span#pass-acc-tip-val {
+  color: #10b981;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.92rem;
 }
 
-body.in-fullscreen-mode .course-tip-banner {
-  margin-bottom: 0.3rem;
-  padding: 0.05rem 0.2rem;
+body.in-fullscreen-mode .course-pass-tip {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
 }
 
 .course-tabs {
@@ -661,6 +674,7 @@ body.in-fullscreen-mode .course-tip-banner {
   flex-wrap: nowrap;
   white-space: nowrap;
   flex-shrink: 0;
+  margin-left: auto; /* 分類及排行往右靠 */
 }
 
 .course-tab-btn {

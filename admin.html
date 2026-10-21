@@ -404,6 +404,54 @@
           </div>
         </div>
 
+        <!-- 卡片: 全校挑戰關卡通關門檻設定 (通過率/準確率標準，需求：管理者後台可調整設定值) -->
+        <div id="card-pass-accuracy-settings" class="admin-card" style="grid-column: 1 / -1; border-color: rgba(16, 185, 129, 0.45); background: linear-gradient(180deg, rgba(16, 185, 129, 0.06), rgba(15, 23, 42, 0.75));">
+          <div class="admin-card-header">
+            <div class="admin-card-title" style="color: #34d399;">
+              <span>🎯</span> 全校挑戰關卡通關門檻設定 (打字準確率通過率)
+            </div>
+            <span class="role-badge teacher">教師與管理員可用</span>
+          </div>
+
+          <p style="font-size:0.76rem; color:var(--text-muted); margin-bottom:1rem; line-height:1.5;">
+            學生在打字主頁挑戰注音盲打、中文生字詞、國小英語以及課堂特訓等各關卡時，結算打字準確率必須達到此設定值方可通關解鎖下一關。首頁左側提示文字與關卡結算判定將自動同步即時生效！
+          </p>
+
+          <div style="display:flex; flex-direction:column; gap:0.85rem;">
+            <div style="display:flex; align-items:center; gap:0.85rem; flex-wrap:wrap;">
+              <label for="admin-pass-accuracy-input" style="font-size:0.85rem; font-weight:bold; color:var(--text-main);">
+                通關準確率門檻：
+              </label>
+              <div style="display:flex; align-items:center; gap:0.35rem;">
+                <input type="number" id="admin-pass-accuracy-input" class="form-input" min="30" max="100" step="5" value="70" style="width:90px; text-align:center; font-size:1.1rem; font-weight:800; color:#10b981; font-family:'JetBrains Mono', monospace;">
+                <span style="font-weight:bold; color:var(--text-main); font-size:1rem;">%</span>
+              </div>
+
+              <!-- 快捷推薦按鈕 -->
+              <div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center;">
+                <span style="font-size:0.75rem; color:var(--text-muted); margin-right:2px;">常用推薦：</span>
+                <button type="button" class="btn-secondary btn-preset-acc" data-val="60" style="font-size:0.75rem; padding:0.3rem 0.65rem;">60% (初學低年級)</button>
+                <button type="button" class="btn-secondary btn-preset-acc" data-val="70" style="font-size:0.75rem; padding:0.3rem 0.65rem; border-color:#10b981; color:#34d399;">70% (標準推薦)</button>
+                <button type="button" class="btn-secondary btn-preset-acc" data-val="80" style="font-size:0.75rem; padding:0.3rem 0.65rem;">80% (精熟進階)</button>
+                <button type="button" class="btn-secondary btn-preset-acc" data-val="90" style="font-size:0.75rem; padding:0.3rem 0.65rem;">90% (高手大師)</button>
+              </div>
+
+              <button type="button" id="admin-btn-save-pass-accuracy" class="btn-primary" style="margin-left:auto; padding:0.5rem 1.25rem; font-size:0.82rem; background:linear-gradient(135deg, #10b981, #059669); flex-shrink:0;">
+                💾 儲存通關門檻
+              </button>
+            </div>
+
+            <!-- 生效狀態與提示條 -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0.9rem; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.25); border-radius:var(--radius-sm); font-size:0.76rem; flex-wrap:wrap; gap:0.5rem;">
+              <div style="display:flex; align-items:center; gap:0.4rem;">
+                <span style="font-size:1rem;">✅</span>
+                <span>目前全校通關標準：準確率需達 <strong id="admin-current-pass-accuracy-hint" style="color:#34d399; font-size:0.95rem; font-family:'JetBrains Mono', monospace;">70%</strong> 即可通關</span>
+              </div>
+              <span style="color:var(--text-muted); font-size:0.72rem;">💡 雲端自動同步至 Firestore (school_config)，首頁即刻套用</span>
+            </div>
+          </div>
+        </div>
+
         <!-- 卡片 2: 班級學生帳號與通行密碼管理 (需求 7: 查閱密碼與協助修改) -->
         <div id="card-students-management" class="admin-card" style="grid-column: 1 / -1; border-color: rgba(99, 102, 241, 0.4);">
           <div class="admin-card-header">
@@ -943,7 +991,7 @@
   </footer>
 
   <!-- 模組腳本載入 (版本號防快取) -->
-  <script src="js/firebase-config.js?v=3.3.0"></script>
-  <script src="js/admin.js?v=3.3.0"></script>
+  <script src="js/firebase-config.js?v=3.3.1"></script>
+  <script src="js/admin.js?v=3.3.1"></script>
 </body>
 </html>
