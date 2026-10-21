@@ -301,7 +301,45 @@
       <!-- 核心功能網格 -->
       <div class="admin-workspace-grid">
 
-        <!-- 卡片 1: 課堂自訂特訓題目發布 (需求 5 & 7) -->
+                <!-- 卡片 1 (左側): 班級與全校即時打字排行榜總覽 (預設全校排行榜，可切換各班) -->
+        <div id="card-leaderboard-overview" class="admin-card" style="border-color: rgba(245, 158, 11, 0.45); display: flex; flex-direction: column;">
+          <div class="admin-card-header">
+            <div class="admin-card-title" style="color:#fbbf24;">
+              <span>🏆</span> 即時打字排行榜 (全校 / 各班級)
+            </div>
+            <span class="role-badge teacher">教師完全可用</span>
+          </div>
+
+          <p style="font-size:0.76rem; color:var(--text-muted); margin-bottom:0.85rem; line-height:1.4;">
+            上課教師可在此掌握全班或全校學生打字即時成績！預設為「全校排行榜」，可透過下拉選單隨時切換至各班級即時排行。
+          </p>
+
+          <!-- 篩選下拉選單與操作區 -->
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:0.75rem;">
+            <div style="flex:1;">
+              <select id="admin-leaderboard-class-select" class="form-select" style="font-size:0.85rem; font-weight:700; border-color:rgba(245, 158, 11, 0.4); color:#fbbf24; background:rgba(15, 23, 42, 0.75);">
+                <option value="all">🌐 全校打字排行榜 (Top 50)</option>
+                <!-- 由 JS 動態注入所有班級 -->
+              </select>
+            </div>
+            <button id="admin-btn-refresh-leaderboard" class="btn-secondary" style="font-size:0.75rem; padding:0.42rem 0.75rem; white-space:nowrap; border-color:rgba(245, 158, 11, 0.4); color:#fbbf24;">
+              🔄 重新整理
+            </button>
+          </div>
+
+          <!-- 排行榜資料呈現區塊 -->
+          <div id="admin-leaderboard-table-container" style="flex:1; max-height:430px; overflow-y:auto; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:rgba(255,255,255,0.02);">
+            <div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.8rem;">正在載入排行榜資料...</div>
+          </div>
+
+          <!-- 底部狀態條 -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.75rem; padding-top:0.5rem; border-top:1px solid var(--border-color); font-size:0.72rem; color:var(--text-muted);">
+            <span>目前榜單總人數：<strong id="admin-leaderboard-count" style="color:#fbbf24;">0</strong> 人</span>
+            <span style="color:#10b981;">⚡ 即時雲端同步</span>
+          </div>
+        </div>
+
+        <!-- 卡片 2 (右側): 課堂自訂特訓題目發布 (移至右側) -->
         <div class="admin-card" style="border-color: rgba(16, 185, 129, 0.4);">
           <div class="admin-card-header">
             <div class="admin-card-title" style="color:#34d399;">

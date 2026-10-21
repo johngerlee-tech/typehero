@@ -214,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 載入資料庫診斷、特訓題目與名冊
     runFirebaseDiagnostic();
     loadPublishedLessonsList();
+    renderAdminLeaderboard();
     renderClassTags();
     loadStudentsRoster();
 
@@ -433,6 +434,190 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnPing) btnPing.onclick = runFirebaseDiagnostic;
 
   // =========================================================================
+  
+  // =========================================================================
+  // 3. 班級/全校即時打字排行榜總覽 (上課教師完全可用)
+  // =========================================================================
+  const adminLeaderboardSelect = document.getElementById('admin-leaderboard-class-select');
+  const adminLeaderboardContainer = document.getElementById('admin-leaderboard-table-container');
+  const adminLeaderboardCount = document.getElementById('admin-leaderboard-count');
+  const adminBtnRefreshLeaderboard = document.getElementById('admin-btn-refresh-leaderboard');
+
+  async function renderAdminLeaderboard() {
+    if (!adminLeaderboardContainer) return;
+    const selectedClass = adminLeaderboardSelect ? adminLeaderboardSelect.value : 'all';
+    adminLeaderboardContainer.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.8rem;">正在載入排行榜資料...</div>';
+
+    if (!window.cloudSync) {
+      adminLeaderboardContainer.innerHTML = '<div style="text-align:center; padding:1.5rem; color:#ef4444; font-size:0.8rem;">雲端模組未載入</div>';
+      return;
+    }
+
+    if (selectedClass === 'all') {
+      // 全校排行榜
+      const rawList = await window.cloudSync.fetchTopScores(50);
+      const list = Array.isArray(rawList) ? rawList : [];
+      if (adminLeaderboardCount) adminLeaderboardCount.innerText = list.length;
+
+      if (list.length === 0) {
+        adminLeaderboardContainer.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.8rem;">目前尚無打字挑戰成績紀錄。</div>';
+        return;
+      }
+
+      let html = `
+        <table class="students-table" style="font-size:0.78rem;">
+          <thead>
+            <tr>
+              <th style="width:45px; text-align:center;">名次</th>
+              <th style="width:80px;">班級座號</th>
+              <th>學生英雄</th>
+              <th style="width:70px; text-align:center;">打字速度</th>
+              <th style="width:60px; text-align:center;">準確率</th>
+              <th>挑戰關卡</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      list.forEach((item, idx) => {
+        let rankBadge = `${idx + 1}`;
+        if (idx === 0) rankBadge = '🥇 1';
+        else if (idx === 1) rankBadge = '🥈 2';
+        else if (idx === 2) rankBadge = '🥉 3';
+
+        const seatClean = item.seatNumber ? String(item.seatNumber).trim() : '';
+        const classSeat = `${item.className || '全校'} ${seatClean ? seatClean + '號' : ''}`;
+        
+        // 嘗試自本機學籍名冊比對真實姓名
+        let realName = '';
+        if (item.className && seatClean && rosterMap && rosterMap.has(`${item.className}_${seatClean}`)) {
+          realName = rosterMap.get(`${item.className}_${seatClean}`).realName;
+        }
+
+        const nickname = item.nickname || '';
+        let heroDisplay = '';
+        if (realName && nickname && realName !== nickname) {
+          heroDisplay = `<span style="font-weight:700; color:var(--text-main);">${escapeHtml(realName)}</span> <span style="color:var(--brand-primary); font-size:0.72rem;">(${escapeHtml(nickname)})</span>`;
+        } else {
+          heroDisplay = `<span style="font-weight:700; color:var(--brand-primary);">${escapeHtml(nickname || realName || '打字英雄')}</span>`;
+        }
+
+        const wpmVal = Math.round(Number(item.wpm) || 0);
+        const accVal = Math.round(Number(item.accuracy) || 0);
+
+        html += `
+          <tr>
+            <td style="text-align:center; font-weight:800; color:${idx < 3 ? '#fbbf24' : 'var(--text-muted)'}; font-size:0.82rem;">
+              ${rankBadge}
+            </td>
+            <td style="font-weight:bold; color:var(--text-main); font-size:0.75rem;">
+              ${escapeHtml(classSeat)}
+            </td>
+            <td>
+              ${heroDisplay}
+            </td>
+            <td style="text-align:center; font-weight:800; color:#38bdf8; font-size:0.85rem;">
+              ${wpmVal} <span style="font-size:0.65rem; color:var(--text-muted);">WPM</span>
+            </td>
+            <td style="text-align:center; font-weight:bold; color:${accVal >= 95 ? '#10b981' : 'var(--text-main)'};">
+              ${accVal}%
+            </td>
+            <td style="color:var(--text-muted); font-size:0.72rem; max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${escapeHtml(item.lessonTitle || '綜合特訓')}
+            </td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table>';
+      adminLeaderboardContainer.innerHTML = html;
+    } else {
+      // 指定班級排行榜
+      const list = await window.cloudSync.fetchClassRankings(selectedClass);
+      const studentList = Array.isArray(list) ? list : [];
+      if (adminLeaderboardCount) adminLeaderboardCount.innerText = studentList.length;
+
+      if (studentList.length === 0) {
+        adminLeaderboardContainer.innerHTML = `<div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.8rem;">【${escapeHtml(selectedClass)}】目前尚無學生登入或測驗資料。</div>`;
+        return;
+      }
+
+      let html = `
+        <table class="students-table" style="font-size:0.78rem;">
+          <thead>
+            <tr>
+              <th style="width:45px; text-align:center;">名次</th>
+              <th style="width:55px; text-align:center;">座號</th>
+              <th>學生身分</th>
+              <th style="width:70px; text-align:center;">最佳速度</th>
+              <th style="width:60px; text-align:center;">準確率</th>
+              <th style="width:85px; text-align:center;">等級/星幣</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      studentList.forEach((item, idx) => {
+        let rankBadge = `${idx + 1}`;
+        if (item.hasScore) {
+          if (idx === 0) rankBadge = '🥇 1';
+          else if (idx === 1) rankBadge = '🥈 2';
+          else if (idx === 2) rankBadge = '🥉 3';
+        } else {
+          rankBadge = '-';
+        }
+
+        const seatStr = `${item.seatNumber}號`;
+        const studentName = item.realName || item.displayName || seatStr;
+        const wpmDisplay = item.hasScore
+          ? `<strong style="color:#38bdf8; font-size:0.85rem;">${item.wpm}</strong> <span style="font-size:0.65rem; color:var(--text-muted);">WPM</span>`
+          : `<span style="color:var(--text-muted); font-size:0.72rem;">未測驗</span>`;
+
+        const accDisplay = item.hasScore
+          ? `<span style="font-weight:bold; color:${item.accuracy >= 95 ? '#10b981' : 'var(--text-main)'};">${item.accuracy}%</span>`
+          : `<span style="color:var(--text-muted);">-</span>`;
+
+        html += `
+          <tr>
+            <td style="text-align:center; font-weight:800; color:${idx < 3 && item.hasScore ? '#fbbf24' : 'var(--text-muted)'}; font-size:0.82rem;">
+              ${rankBadge}
+            </td>
+            <td style="text-align:center; font-family:monospace; font-weight:bold; color:var(--text-main);">
+              ${escapeHtml(seatStr)}
+            </td>
+            <td>
+              <span style="font-weight:700; color:var(--text-main);">${escapeHtml(studentName)}</span>
+              ${item.nickname && item.realName ? `<span style="color:var(--brand-primary); font-size:0.7rem; margin-left:3px;">(${escapeHtml(item.nickname)})</span>` : ''}
+            </td>
+            <td style="text-align:center;">
+              ${wpmDisplay}
+            </td>
+            <td style="text-align:center;">
+              ${accDisplay}
+            </td>
+            <td style="text-align:center; font-size:0.72rem; color:var(--text-muted);">
+              Lv.${item.level || 1} · 🪙 ${item.coins || 0}
+            </td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table>';
+      adminLeaderboardContainer.innerHTML = html;
+    }
+  }
+
+  if (adminLeaderboardSelect) {
+    adminLeaderboardSelect.onchange = () => {
+      renderAdminLeaderboard();
+    };
+  }
+  if (adminBtnRefreshLeaderboard) {
+    adminBtnRefreshLeaderboard.onclick = () => {
+      renderAdminLeaderboard();
+    };
+  }
+
   // 4. 課堂自訂特訓題目發布 (需求 5: 支援指定班級下拉選單)
   // =========================================================================
   const targetClassSelect = document.getElementById('admin-custom-target-class');

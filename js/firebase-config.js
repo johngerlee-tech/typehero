@@ -432,6 +432,25 @@ class CloudSyncManager {
       }
     });
 
+    // 填入後臺「即時打字排行榜」班級下拉選單 (預設全校排行榜)
+    const adminLeaderboardSel = document.getElementById('admin-leaderboard-class-select');
+    if (adminLeaderboardSel) {
+      const curVal = adminLeaderboardSel.value || 'all';
+      adminLeaderboardSel.innerHTML = '';
+      const allOpt = document.createElement('option');
+      allOpt.value = 'all';
+      allOpt.innerText = '🌐 全校打字排行榜 (Top 50)';
+      adminLeaderboardSel.appendChild(allOpt);
+
+      sortedList.forEach(cls => {
+        const opt = document.createElement('option');
+        opt.value = cls;
+        opt.innerText = `🏫 ${cls} 排行榜`;
+        adminLeaderboardSel.appendChild(opt);
+      });
+      adminLeaderboardSel.value = curVal;
+    }
+
     // 填入「班級排行榜」前臺下拉選單
     const classLeaderboardSelect = document.getElementById('class-leaderboard-select');
     if (classLeaderboardSelect) {
