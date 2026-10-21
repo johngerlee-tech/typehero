@@ -2614,3 +2614,18 @@ footer {
 
 
 
+
+/* 登出按鈕專屬警示風格與動態光暈效果 */
+.btn-icon.btn-logout {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.btn-icon.btn-logout:hover {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: #ef4444;
+  color: #ef4444;
+  transform: scale(1.15) translateY(-2px);
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.45);
+}

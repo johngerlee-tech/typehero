@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let adminRole = null; // 'teacher' | 'master_admin' | null
   let currentAuthUser = null;
   let showPasswords = false;
+  let rosterMap = new Map();
+  let parsed115Roster = [];
 
   // DOM 元素快取
   const loginView = document.getElementById('admin-login-view');
@@ -201,6 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadPublishedLessonsList();
     renderClassTags();
     loadStudentsRoster();
+
+    // 需求 4: 介面載入時即自動在背景進行既有資料與真實姓名綁定
+    autoSyncRosterOnLoad();
   }
 
   // 登出邏輯
@@ -234,26 +239,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetClassesBtn = document.getElementById('admin-btn-reset-classes');
     const saveBatchBtn = document.getElementById('admin-btn-save-batch');
 
-    if (isTeacher) {
-      if (cardClass) cardClass.classList.add('locked-card');
-      if (noticeClassLocked) noticeClassLocked.style.display = 'flex';
-      if (badgeClassRole) badgeClassRole.innerText = '🔒 僅限最高管理員';
-      if (newClassInp) newClassInp.disabled = true;
-      if (addClassBtn) addClassBtn.disabled = true;
-      if (toggleBatchBtn) toggleBatchBtn.disabled = true;
-      if (resetClassesBtn) resetClassesBtn.disabled = true;
-      if (saveBatchBtn) saveBatchBtn.disabled = true;
-    } else {
-      if (cardClass) cardClass.classList.remove('locked-card');
-      if (noticeClassLocked) noticeClassLocked.style.display = 'none';
-      if (badgeClassRole) badgeClassRole.innerText = '👑 具備完全權限';
-      if (newClassInp) newClassInp.disabled = false;
-      if (addClassBtn) addClassBtn.disabled = false;
-      if (toggleBatchBtn) toggleBatchBtn.disabled = false;
-      if (resetClassesBtn) resetClassesBtn.disabled = false;
-      if (saveBatchBtn) saveBatchBtn.disabled = false;
-    }
-
     // 卡片 4: 排行榜清空與主管理密碼修改
     const cardSecurity = document.getElementById('card-security-settings');
     const noticeSecurityLocked = document.getElementById('notice-security-locked');
@@ -274,22 +259,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const badgeTeachersRole = document.getElementById('badge-teachers-role');
     const refreshTeachersBtn = document.getElementById('admin-btn-refresh-teachers');
 
+    // 卡片 6: 學年度編班名冊與學生資產升級移轉精靈
+    const cardMigration = document.getElementById('card-roster-migration');
+    const noticeMigrationLocked = document.getElementById('notice-migration-locked');
+    const badgeMigrationRole = document.getElementById('badge-migration-role');
+    const btnExecute115 = document.getElementById('btn-execute-115-binding');
+    const btnExecuteMigration = document.getElementById('btn-execute-migration');
+    const btnSyncClasses = document.getElementById('btn-sync-115-classes');
+
+    // 需求 1: "教師登入"後台只需看到"教師完全可用"的區塊部分即可，"👑 具備完全權限"反正不能操作就完全隱藏不顯示
     if (isTeacher) {
-      if (cardSecurity) cardSecurity.classList.add('locked-card');
-      if (noticeSecurityLocked) noticeSecurityLocked.style.display = 'flex';
-      if (badgeSecurityRole) badgeSecurityRole.innerText = '🔒 僅限最高管理員';
-      if (clearLbBtn) clearLbBtn.disabled = true;
-      if (newPwdInp) newPwdInp.disabled = true;
-      if (savePwdBtn) savePwdBtn.disabled = true;
-      if (pwdHint) pwdHint.innerText = '••••';
-
-      if (teacherPasscodeInp) teacherPasscodeInp.disabled = true;
-      if (saveTeacherPasscodeBtn) saveTeacherPasscodeBtn.disabled = true;
-      if (teacherPasscodeHint) teacherPasscodeHint.innerText = '••••';
-
-      if (cardTeachers) cardTeachers.style.display = 'none'; // 對一般教師隱藏名冊管理卡片
+      if (cardClass) cardClass.style.display = 'none';
+      if (cardSecurity) cardSecurity.style.display = 'none';
+      if (cardTeachers) cardTeachers.style.display = 'none';
+      if (cardMigration) cardMigration.style.display = 'none';
     } else {
-      if (cardSecurity) cardSecurity.classList.remove('locked-card');
+      if (cardClass) {
+        cardClass.style.display = '';
+        cardClass.classList.remove('locked-card');
+      }
+      if (noticeClassLocked) noticeClassLocked.style.display = 'none';
+      if (badgeClassRole) badgeClassRole.innerText = '👑 具備完全權限';
+      if (newClassInp) newClassInp.disabled = false;
+      if (addClassBtn) addClassBtn.disabled = false;
+      if (toggleBatchBtn) toggleBatchBtn.disabled = false;
+      if (resetClassesBtn) resetClassesBtn.disabled = false;
+      if (saveBatchBtn) saveBatchBtn.disabled = false;
+
+      if (cardSecurity) {
+        cardSecurity.style.display = '';
+        cardSecurity.classList.remove('locked-card');
+      }
       if (noticeSecurityLocked) noticeSecurityLocked.style.display = 'none';
       if (badgeSecurityRole) badgeSecurityRole.innerText = '👑 具備完全權限';
       if (clearLbBtn) clearLbBtn.disabled = false;
@@ -306,33 +306,84 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (cardTeachers) {
-        cardTeachers.style.display = 'block';
+        cardTeachers.style.display = '';
         cardTeachers.classList.remove('locked-card');
       }
       if (noticeTeachersLocked) noticeTeachersLocked.style.display = 'none';
       if (badgeTeachersRole) badgeTeachersRole.innerText = '👑 具備完全權限';
       if (refreshTeachersBtn) refreshTeachersBtn.disabled = false;
       loadTeachersList();
-    }
 
-    // 卡片 6: 學年度編班名冊與學生資產升級移轉精靈
-    const noticeMigrationLocked = document.getElementById('notice-migration-locked');
-    const badgeMigrationRole = document.getElementById('badge-migration-role');
-    const btnExecute115 = document.getElementById('btn-execute-115-binding');
-    const btnExecuteMigration = document.getElementById('btn-execute-migration');
-    const btnSyncClasses = document.getElementById('btn-sync-115-classes');
-
-    if (isTeacher) {
-      if (noticeMigrationLocked) noticeMigrationLocked.style.display = 'flex';
-      if (badgeMigrationRole) badgeMigrationRole.innerText = '🔒 僅限最高管理員';
-      if (btnExecute115) btnExecute115.disabled = true;
-      if (btnExecuteMigration) btnExecuteMigration.disabled = true;
-      if (btnSyncClasses) btnSyncClasses.disabled = true;
-    } else {
+      if (cardMigration) {
+        cardMigration.style.display = '';
+      }
       if (noticeMigrationLocked) noticeMigrationLocked.style.display = 'none';
       if (badgeMigrationRole) badgeMigrationRole.innerText = '👑 具備完全權限';
       if (btnExecute115) btnExecute115.disabled = false;
       if (btnExecuteMigration) btnExecuteMigration.disabled = false;
+
+  // =========================================================================
+  // 全校名冊記憶庫與自動綁定引擎 (需求 4)
+  // =========================================================================
+  function initRosterData() {
+    try {
+      parsed115Roster = parseRosterCSV(DEFAULT_115_ROSTER_CSV);
+      rosterMap.clear();
+      parsed115Roster.forEach(s => {
+        rosterMap.set(`${s.className}_${s.seatNumber}`, s);
+      });
+      console.log(`📋 [全校名冊記憶庫] 已成功預載 115 學年度全校名冊，共 ${rosterMap.size} 筆學生學籍`);
+    } catch (e) {
+      console.warn('預載名冊失敗:', e);
+    }
+
+    // 嘗試非同步載入最新的 student_115.csv
+    fetch('student_115.csv').then(resp => {
+      if (resp.ok) return resp.text();
+      throw new Error('No local csv file');
+    }).then(text => {
+      const fresh = parseRosterCSV(text);
+      if (fresh && fresh.length > 0) {
+        parsed115Roster = fresh;
+        rosterMap.clear();
+        parsed115Roster.forEach(s => {
+          rosterMap.set(`${s.className}_${s.seatNumber}`, s);
+        });
+        console.log(`📋 [全校名冊即時更新] 已同步 student_115.csv 最新名冊 (${rosterMap.size} 筆)`);
+      }
+    }).catch(() => {});
+  }
+
+  async function autoSyncRosterOnLoad() {
+    if (!window.cloudSync || !window.cloudSync.isFirebaseReady) return;
+    try {
+      if (!parsed115Roster || parsed115Roster.length === 0) {
+        initRosterData();
+      }
+      if (!parsed115Roster || parsed115Roster.length === 0) return;
+
+      const syncKey = 'typehero_roster_auto_synced_115_v2';
+      const lastSync = localStorage.getItem(syncKey);
+      const now = Date.now();
+      if (lastSync && (now - Number(lastSync) < 12 * 60 * 60 * 1000)) {
+        console.log('ℹ️ 全校名冊身分綁定近期已同步過，維持即時智慧補齊。');
+        return;
+      }
+
+      console.log('🚀 [自動身分綁定] 正在為全校學生名冊自動執行 Firestore 身分綁定...');
+      const res = await window.cloudSync.bindStudentRoster(parsed115Roster, () => {});
+      if (res && res.success) {
+        localStorage.setItem(syncKey, String(now));
+        console.log(`✅ [自動身分綁定完成] 成功自動補齊 ${res.matchedCount || parsed115Roster.length} 筆學生身分綁定！`);
+      }
+    } catch (err) {
+      console.warn('背景自動名冊身分綁定遭遇問題:', err);
+    }
+  }
+
+  // 頁面就緒時立即預載名冊
+  initRosterData();
+
       if (btnSyncClasses) btnSyncClasses.disabled = false;
     }
   }
@@ -673,7 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     studentsTableBody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align:center; padding:1.2rem; color:var(--text-muted);">
+        <td colspan="8" style="text-align:center; padding:1.2rem; color:var(--text-muted);">
           正在讀取【${selectedClass}】學生名冊...
         </td>
       </tr>
@@ -684,10 +735,40 @@ document.addEventListener('DOMContentLoaded', () => {
       students = await window.cloudSync.fetchClassStudents(selectedClass);
     }
 
+    // 需求 4: 自動與名冊即時比對，無縫補齊真實姓名與學號
+    if (rosterMap && rosterMap.size > 0) {
+      students.forEach(st => {
+        const match = rosterMap.get(`${selectedClass}_${st.seatNumber}`);
+        if (match) {
+          if (!st.realName || st.realName === '未綁定') st.realName = match.realName;
+          if (!st.studentNo || st.studentNo === '-') st.studentNo = match.studentNo;
+          if (!st.academicYear) st.academicYear = match.academicYear || '115';
+        }
+      });
+    }
+
+    // 若雲端尚未有任何學生註冊紀錄，但名冊有該班學生名單，直接呈現名冊清單
+    if ((!students || students.length === 0) && parsed115Roster && parsed115Roster.length > 0) {
+      const rosterStudents = parsed115Roster.filter(s => s.className === selectedClass);
+      if (rosterStudents.length > 0) {
+        students = rosterStudents.map(s => ({
+          className: s.className,
+          seatNumber: s.seatNumber,
+          realName: s.realName,
+          studentNo: s.studentNo,
+          academicYear: s.academicYear || '115',
+          nickname: '',
+          level: 1,
+          coins: 0,
+          password: ''
+        }));
+      }
+    }
+
     if (!students || students.length === 0) {
       studentsTableBody.innerHTML = `
         <tr>
-          <td colspan="6" style="text-align:center; padding:1.2rem; color:var(--text-muted);">
+          <td colspan="8" style="text-align:center; padding:1.2rem; color:var(--text-muted);">
             ℹ️【${selectedClass}】目前尚無學生上線註冊紀錄。<br>
             當學生在打字學院首頁登載座號時，將會自動在此處建立專屬檔案與密碼。
           </td>
@@ -696,32 +777,58 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // 若有學生缺少雲端真實姓名綁定，背景靜默補寫入 Firestore
+    if (window.cloudSync && window.cloudSync.db && rosterMap) {
+      students.forEach(st => {
+        const match = rosterMap.get(`${selectedClass}_${st.seatNumber}`);
+        if (match && !st._syncedToDb) {
+          st._syncedToDb = true;
+          window.cloudSync.db.collection('students').doc(`${selectedClass}_${st.seatNumber}`).set({
+            className: selectedClass,
+            seatNumber: String(st.seatNumber).trim(),
+            realName: match.realName,
+            studentNo: match.studentNo,
+            academicYear: match.academicYear || '115',
+            status: 'active'
+          }, { merge: true }).catch(e => console.warn('背景自動補齊學生身分失敗:', e));
+        }
+      });
+    }
+
     studentsTableBody.innerHTML = '';
     students.forEach(st => {
       const tr = document.createElement('tr');
       const pwdDisplay = showPasswords
-        ? (st.password ? `<span class="pwd-code-badge">${st.password}</span>` : '<span style="color:var(--text-muted);">無密碼</span>')
-        : (st.password ? '<span class="pwd-code-badge">••••</span>' : '<span style="color:var(--text-muted);">無密碼</span>');
+        ? (st.password ? `<span class="pwd-code-badge">${st.password}</span>` : '<span style="color:var(--text-muted); font-size:0.75rem;">無密碼</span>')
+        : (st.password ? '<span class="pwd-code-badge">••••</span>' : '<span style="color:var(--text-muted); font-size:0.75rem;">無密碼</span>');
 
-      const studentNoDisplay = st.studentNo ? `<code style="color:#38bdf8; font-size:0.75rem; font-weight:bold;">${st.studentNo}</code>` : '<span style="color:var(--text-muted); font-size:0.75rem;">-</span>';
+      const studentNoDisplay = st.studentNo ? `<code style="color:#38bdf8; font-size:0.78rem; font-weight:bold;">${st.studentNo}</code>` : '<span style="color:var(--text-muted); font-size:0.75rem;">-</span>';
       const realNameDisplay = st.realName ? `<span style="font-weight:bold; color:#fff;">${st.realName}</span>` : '<span style="color:var(--text-muted); font-size:0.75rem;">未綁定</span>';
 
       tr.innerHTML = `
-        <td style="font-weight:bold;">${st.seatNumber || '0'}</td>
+        <td style="font-weight:bold; font-size:0.92rem; color:var(--text-main);">${st.seatNumber || '0'}</td>
         <td>${studentNoDisplay}</td>
         <td>${realNameDisplay}</td>
         <td style="font-weight:bold; color:var(--brand-primary);">${st.nickname || '<span style="color:var(--text-muted); font-weight:normal;">未設定</span>'}</td>
-        <td>Lv.${st.level || 1}</td>
+        <td><span style="background:rgba(99,102,241,0.15); color:#818cf8; padding:0.12rem 0.45rem; border-radius:4px; font-weight:bold; font-size:0.75rem;">Lv.${st.level || 1}</span></td>
         <td style="color:#fbbf24; font-weight:bold;">🪙 ${st.coins || 0}</td>
         <td>${pwdDisplay}</td>
-        <td style="text-align:center;">
-          <button class="btn-secondary btn-modify-pwd" style="font-size:0.72rem; padding:0.25rem 0.55rem; border-color:var(--brand-primary); color:var(--brand-primary);">
-            ✏️ 修改密碼
-          </button>
+        <td style="text-align:center; white-space:nowrap;">
+          <div style="display:flex; gap:0.35rem; justify-content:center; align-items:center;">
+            <button class="btn-secondary btn-modify-pwd" style="font-size:0.72rem; padding:0.25rem 0.5rem; border-color:var(--brand-primary); color:var(--brand-primary);" title="協助學生重設通行密碼">
+              ✏️ 改密碼
+            </button>
+            <button class="btn-secondary btn-unbind-student" style="font-size:0.72rem; padding:0.25rem 0.55rem; border-color:#f59e0b; color:#fbbf24; background:rgba(245, 158, 11, 0.12); font-weight:bold;" title="【上課老師可用】解除他人冒用綁定，清空密碼與暱稱讓原座號學生重新登入">
+              🔓 解除綁定
+            </button>
+            <button class="btn-secondary btn-delete-student" style="font-size:0.72rem; padding:0.25rem 0.5rem; border-color:rgba(239, 68, 68, 0.5); color:#f87171; background:rgba(239, 68, 68, 0.08);" title="刪除此座號之雲端存檔">
+              🗑️ 刪除
+            </button>
+          </div>
         </td>
       `;
 
-      // 點擊「修改密碼」彈窗迅速為學生重設
+      // 1. 點擊「修改密碼」彈窗迅速為學生重設
       tr.querySelector('.btn-modify-pwd').onclick = async () => {
         const studentDesc = `${selectedClass} ${st.seatNumber}號 ${st.realName ? st.realName + ' ' : ''}(${st.nickname || '學生'})`;
         const newPass = prompt(`請輸入【${studentDesc}】的新通行密碼：\n(目前密碼：${st.password || '無'})`, st.password || '');
@@ -735,6 +842,40 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
               alert('❌ 修改失敗，請確認網路連線。');
             }
+          }
+        }
+      };
+
+      // 2. 點擊「解除綁定」 (需求 2: 解除別人亂使用該座號的綁定)
+      tr.querySelector('.btn-unbind-student').onclick = async () => {
+        const studentDesc = `${selectedClass} ${st.seatNumber}號 ${st.realName ? st.realName + ' ' : ''}`;
+        const confirmMsg = `確定要為【${studentDesc}】解除身分綁定嗎？\n\n🎯 上課教師即時處置情境：\n當學生座號遭其他非本班同學或他人亂登入占用時，授課教師可立即執行此解除綁定！\n\n執行後將會：\n1. 立即清空該座號被亂設定的通行密碼與自訂暱稱（原座號同學當場可重新自由登入並設定密碼）\n2. 100% 完整保留原本校內名冊記載之「真實姓名」與「學號」學籍\n3. 重設該座號的冒用累積紀錄\n\n確定立即解除冒用綁定？`;
+        if (!confirm(confirmMsg)) return;
+
+        if (window.cloudSync && window.cloudSync.adminUnbindStudent) {
+          const ok = await window.cloudSync.adminUnbindStudent(selectedClass, st.seatNumber, st.realName, st.studentNo);
+          if (ok) {
+            alert(`✅ 成功！已解除【${studentDesc}】的冒用綁定！\n密碼與自訂暱稱已清除，原座號同學現在可以正常重新登入了。`);
+            loadStudentsRoster();
+          } else {
+            alert('❌ 解除綁定失敗，請確認 Firebase 網路連線。');
+          }
+        }
+      };
+
+      // 3. 點擊「刪除」 (需求 2: 徹底刪除指定座號檔案)
+      tr.querySelector('.btn-delete-student').onclick = async () => {
+        const studentDesc = `${selectedClass} ${st.seatNumber}號 ${st.realName ? st.realName + ' ' : ''}(${st.nickname || '無暱稱'})`;
+        const confirmMsg = `⚠️ 警告：確定要徹底「刪除」【${studentDesc}】的雲端學生存檔紀錄嗎？\n\n刪除後該座號之所有雲端紀錄（含星幣、等級與密碼）將被永久移除。\n（若僅是被他人冒用登入，建議使用「解除綁定」即可）\n\n確定徹底刪除？`;
+        if (!confirm(confirmMsg)) return;
+
+        if (window.cloudSync && window.cloudSync.adminDeleteStudent) {
+          const ok = await window.cloudSync.adminDeleteStudent(selectedClass, st.seatNumber);
+          if (ok) {
+            alert(`✅ 已成功刪除【${studentDesc}】之雲端檔案！`);
+            loadStudentsRoster();
+          } else {
+            alert('❌ 刪除失敗，請確認 Firebase 網路連線。');
           }
         }
       };
@@ -1313,7 +1454,7 @@ document.addEventListener('DOMContentLoaded', () => {
 六年乙班,20,吳怡蓁,110020,115
 六年乙班,21,張祐芯,110048,115`;
 
-  let parsed115Roster = null;
+  // parsed115Roster 已於全域由 initRosterData 統一維護
   let parsedUpgradeRoster = null;
   let currentMigrationPlan = null;
 
@@ -1348,7 +1489,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const className = parts[classIdx] || '';
       const seatRaw = parts[seatIdx] || '';
-      const seatNumber = seatRaw ? String(parseInt(seatRaw, 10) || seatRaw) : '';
+      const seatNumber = seatRaw ? seatRaw.trim() : '';
       const realName = nameIdx !== -1 ? (parts[nameIdx] || '') : '';
       const studentNo = idIdx !== -1 ? (parts[idIdx] || '') : '';
       const academicYear = yearIdx !== -1 ? (parts[yearIdx] || '115') : '115';
@@ -1687,5 +1828,67 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
   }
+
+  // =========================================================================
+  // 全校名冊記憶庫與自動綁定引擎 (需求 4)
+  // =========================================================================
+  function initRosterData() {
+    try {
+      parsed115Roster = parseRosterCSV(DEFAULT_115_ROSTER_CSV);
+      rosterMap.clear();
+      parsed115Roster.forEach(s => {
+        rosterMap.set(`${s.className}_${s.seatNumber}`, s);
+      });
+      console.log(`📋 [全校名冊記憶庫] 已成功預載 115 學年度全校名冊，共 ${rosterMap.size} 筆學生學籍`);
+    } catch (e) {
+      console.warn('預載名冊失敗:', e);
+    }
+
+    // 嘗試非同步載入最新的 student_115.csv
+    fetch('student_115.csv').then(resp => {
+      if (resp.ok) return resp.text();
+      throw new Error('No local csv file');
+    }).then(text => {
+      const fresh = parseRosterCSV(text);
+      if (fresh && fresh.length > 0) {
+        parsed115Roster = fresh;
+        rosterMap.clear();
+        parsed115Roster.forEach(s => {
+          rosterMap.set(`${s.className}_${s.seatNumber}`, s);
+        });
+        console.log(`📋 [全校名冊即時更新] 已同步 student_115.csv 最新名冊 (${rosterMap.size} 筆)`);
+      }
+    }).catch(() => {});
+  }
+
+  async function autoSyncRosterOnLoad() {
+    if (!window.cloudSync || !window.cloudSync.isFirebaseReady) return;
+    try {
+      if (!parsed115Roster || parsed115Roster.length === 0) {
+        initRosterData();
+      }
+      if (!parsed115Roster || parsed115Roster.length === 0) return;
+
+      const syncKey = 'typehero_roster_auto_synced_115_v2';
+      const lastSync = localStorage.getItem(syncKey);
+      const now = Date.now();
+      if (lastSync && (now - Number(lastSync) < 12 * 60 * 60 * 1000)) {
+        console.log('ℹ️ 全校名冊身分綁定近期已同步過，維持即時智慧補齊。');
+        return;
+      }
+
+      console.log('🚀 [自動身分綁定] 正在為全校學生名冊自動執行 Firestore 身分綁定...');
+      const res = await window.cloudSync.bindStudentRoster(parsed115Roster, () => {});
+      if (res && res.success) {
+        localStorage.setItem(syncKey, String(now));
+        console.log(`✅ [自動身分綁定完成] 成功自動補齊 ${res.matchedCount || parsed115Roster.length} 筆學生身分綁定！`);
+      }
+    } catch (err) {
+      console.warn('背景自動名冊身分綁定遭遇問題:', err);
+    }
+  }
+
+  // 頁面就緒時立即預載名冊
+  initRosterData();
 });
 

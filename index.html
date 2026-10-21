@@ -88,6 +88,11 @@
           <span>⚙️</span>
         </button>
 
+        <!-- 登出按鈕 (換人練功) -->
+        <button id="nav-btn-logout" class="btn-icon btn-logout" title="登出目前學生帳號 (換人練功)">
+          <span>🚪</span>
+        </button>
+
         <!-- 選擇關卡快速錨點 -->
         <a href="#lessons-panel" class="btn-primary" style="text-decoration: none;">
           <span>關卡<BR>地圖</span>
@@ -522,9 +527,14 @@
           </div>
         </div>
 
-        <button id="save-profile-btn" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.75rem; font-size: 0.95rem;">
-          💾 儲存修改並同步至雲端
-        </button>
+        <div style="display:flex; gap:0.75rem;">
+          <button id="save-profile-btn" class="btn-primary" style="flex:1; justify-content: center; padding: 0.75rem; font-size: 0.95rem;">
+            💾 儲存修改並同步至雲端
+          </button>
+          <button id="profile-logout-btn" class="btn-primary" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 0.75rem 1.1rem; font-size: 0.95rem; cursor: pointer; white-space: nowrap;" title="登出目前帳號，換其他同學登入">
+            🚪 登出
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -579,7 +589,7 @@
               <label for="login-seat-input" style="font-size:0.85rem; font-weight:bold; display:flex; align-items:center; gap:0.4rem; margin-bottom:0.35rem;">
                 <span>🔢 學生座號</span>
               </label>
-              <input type="number" id="login-seat-input" class="form-input" min="1" max="60" placeholder="例如：18" required>
+              <input type="text" inputmode="numeric" id="login-seat-input" class="form-input" placeholder="例如：1 或 18" maxlength="10" required>
             </div>
             <div>
               <label for="login-name-input" style="font-size:0.85rem; font-weight:bold; display:flex; align-items:center; gap:0.4rem; margin-bottom:0.35rem;">
@@ -773,13 +783,13 @@
           </label>
           <div style="display:flex; flex-direction:column; gap:0.5rem;">
             <div style="display:flex; gap:0.5rem; align-items:center;">
-              <input type="password" id="admin-new-password" class="form-input" placeholder="請輸入新密碼 (例如：1234 或 自訂英數密碼)" style="flex:1;">
+              <input type="password" id="admin-new-password" class="form-input" placeholder="請輸入新密碼 (自訂英數密碼)" style="flex:1;">
               <button id="admin-btn-save-password" class="btn-primary" style="padding:0.55rem 1rem; flex-shrink:0;">
                 💾 變更密碼
               </button>
             </div>
             <span style="font-size:0.74rem; color:var(--text-muted);">
-              目前管理密碼為：<strong style="color:var(--brand-primary); letter-spacing:1px;" id="admin-current-pwd-hint">1234</strong>（可在此直接輸入新密碼儲存）
+              目前管理密碼為：<strong style="color:var(--brand-primary); letter-spacing:1px;" id="admin-current-pwd-hint">••••</strong>（可在此直接輸入新密碼儲存）
             </span>
           </div>
         </div>
@@ -806,13 +816,13 @@
         </div>
 
         <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:1.1rem;">
-          為防止學童誤觸或任意刪除班級設定，請輸入教師管理密碼。（<strong>預設密碼：1234</strong>）
+          為防止學童誤觸或任意刪除班級設定，請輸入教師管理密碼。
         </p>
 
         <form id="form-admin-auth" onsubmit="return false;" style="display:flex; flex-direction:column; gap:0.75rem;">
           <div>
             <label for="admin-auth-password" style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.3rem;">管理密碼</label>
-            <input type="password" id="admin-auth-password" class="form-input" placeholder="請輸入密碼 (預設 1234)" autocomplete="current-password" required>
+            <input type="password" id="admin-auth-password" class="form-input" placeholder="請輸入密碼" autocomplete="current-password" required>
           </div>
           <div id="admin-auth-error" style="color:#ef4444; font-size:0.75rem; font-weight:bold; display:none;">
             ❌ 密碼錯誤，請重新輸入！
@@ -836,6 +846,10 @@
           🎒 切換學生身分
         </a>
         <span>·</span>
+        <a href="javascript:void(0)" onclick="window.studentLogout && window.studentLogout()" style="color: #f87171; font-weight: bold;">
+          🚪 登出帳號
+        </a>
+        <span>·</span>
         <a href="admin.html" target="_blank">
           ⚙️ 教師後臺管理 (新分頁)
         </a>
@@ -846,8 +860,8 @@
   <!-- 核心模組腳本載入 (加入版本控制防止快取) -->
   <script src="js/audio.js?v=2.5.2"></script>
   <script src="js/lessons.js?v=2.5.2"></script>
-  <script src="js/shop.js?v=2.7.0"></script>
-  <script src="js/firebase-config.js?v=2.7.0"></script>
-  <script src="js/app.js?v=2.7.0"></script>
+  <script src="js/shop.js?v=2.8.0"></script>
+  <script src="js/firebase-config.js?v=2.8.0"></script>
+  <script src="js/app.js?v=2.8.0"></script>
 </body>
 </html>

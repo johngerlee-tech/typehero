@@ -1882,57 +1882,136 @@ function initModals() {
   if (lbAcc) lbAcc.onclick = () => renderLeaderboard('accuracy');
   if (lbDil) lbDil.onclick = () => renderLeaderboard('diligence');
 
-  // 1. 個人班級雲端設定彈窗 (需求 3: 點擊不應切換班級座號，而是修改暱稱與通行密碼)
+  // 學生主動登出帳號機制 (支援頂部導航 🚪、個人設定彈窗、頁尾切換)
+  window.studentLogout = async function(skipConfirm = false) {
+    const curP = window.cloudSync ? window.cloudSync.profile : null;
+    const hasActiveUser = curP && curP.hasRegistered && curP.className && curP.seatNumber;
+    const displayName = hasActiveUser
+      ? (curP.nickname || curP.realName || `${curP.className} ${curP.seatNumber}號`)
+      : '目前帳號';
+
+    if (!skipConfirm) {
+      const isOk = confirm(`確定要登出【${displayName}】的學生帳號嗎？\n\n💡 提示：\n1. 您的等級、成就、星幣與已購買商品皆已自動妥善保存至雲端！\n2. 登出後畫面將會重置，方便其他同學登入使用。\n3. 下次在任何電腦輸入相同的「班級、座號與密碼」，即可隨時完整還原所有進度！`);
+      if (!isOk) return;
+    }
+
+    // 1. 若當前有登入且有進度，確保在登出前最後同步一次至雲端
+    if (hasActiveUser && window.cloudSync.isFirebaseReady) {
+      try {
+        await window.cloudSync.syncProfileToCloud();
+      } catch (e) {
+        console.warn('登出前存檔同步提示:', e);
+      }
+    }
+
+    // 2. 清除本機登入身分快取
+    if (window.cloudSync) {
+      window.cloudSync.logoutStudent();
+    }
+
+    // 3. 重設本機商城/進度至純淨預設狀態 (不帶學生識別碼)
+    if (window.shopManager) {
+      window.shopManager.currentStudentId = null;
+      window.shopManager.resetToDefault(null);
+    }
+
+    // 4. 重設關卡卡片星等進度至空白初始狀態
+    if (gameState && gameState.currentCategory && window.COURSES && typeof renderLessonsGrid === 'function') {
+      renderLessonsGrid(window.COURSES[gameState.currentCategory]);
+    }
+
+    // 5. 關閉個人檔案彈窗（若開啟中）
+    const profileModal = document.getElementById('modal-profile');
+    if (profileModal) profileModal.classList.remove('active');
+
+    // 6. 顯示登出成功提示
+    if (window.cloudSync && typeof window.cloudSync.showToast === 'function') {
+      window.cloudSync.showToast(`👋 已成功登出【${displayName}】！進度已安全保存。`, 'info');
+    }
+
+    // 7. 自動彈出學生登入視窗，方便下一位同學登入
+    if (typeof window.openStudentLoginModal === 'function') {
+      window.openStudentLoginModal();
+    }
+  };
+
+  // 1. 個人班級雲端設定彈窗 (需求 3: 點擊可修改暱稱與密碼；若未登入則開啟登入視窗)
   const profileModal = document.getElementById('modal-profile');
-  document.getElementById('user-profile-badge').onclick = () => {
-    const p = window.cloudSync ? window.cloudSync.profile : { className: '5年3班', seatNumber: '01', nickname: '鍵盤小英雄' };
-    const classSeatTag = document.getElementById('profile-modal-class-seat');
-    const nickInp = document.getElementById('input-nickname');
-    const passInp = document.getElementById('input-profile-password');
+  const userProfileBadge = document.getElementById('user-profile-badge');
+  if (userProfileBadge) {
+    userProfileBadge.onclick = () => {
+      const p = window.cloudSync ? window.cloudSync.profile : null;
+      if (!p || !p.hasRegistered) {
+        if (typeof window.openStudentLoginModal === 'function') {
+          window.openStudentLoginModal();
+        }
+        return;
+      }
+      const classSeatTag = document.getElementById('profile-modal-class-seat');
+      const nickInp = document.getElementById('input-nickname');
+      const passInp = document.getElementById('input-profile-password');
 
-    if (classSeatTag) classSeatTag.innerText = `${p.className} ${p.seatNumber}號`;
-    if (nickInp) nickInp.value = p.nickname || '';
-    if (passInp) passInp.value = ''; // 保持空白，使用者輸入時才變更
+      if (classSeatTag) classSeatTag.innerText = `${p.className} ${p.seatNumber}號`;
+      if (nickInp) nickInp.value = p.nickname || '';
+      if (passInp) passInp.value = ''; // 保持空白，使用者輸入時才變更
 
-    // 同步顯示目前裝備的冒險角色大貼紙
-    const modalAvatar = document.getElementById('profile-modal-avatar');
-    if (modalAvatar && window.shopManager) {
-      const activeAvatar = window.shopManager.catalog.avatars.find(a => a.id === window.shopManager.data.equippedAvatar);
-      modalAvatar.innerText = activeAvatar ? activeAvatar.preview : '🐱';
-    }
+      // 同步顯示目前裝備的冒險角色大貼紙
+      const modalAvatar = document.getElementById('profile-modal-avatar');
+      if (modalAvatar && window.shopManager) {
+        const activeAvatar = window.shopManager.catalog.avatars.find(a => a.id === window.shopManager.data.equippedAvatar);
+        modalAvatar.innerText = activeAvatar ? activeAvatar.preview : '🐱';
+      }
 
-    profileModal.classList.add('active');
-  };
+      if (profileModal) profileModal.classList.add('active');
+    };
+  }
 
-  document.getElementById('close-profile-btn').onclick = () => profileModal.classList.remove('active');
+  const closeProfileBtn = document.getElementById('close-profile-btn');
+  if (closeProfileBtn && profileModal) {
+    closeProfileBtn.onclick = () => profileModal.classList.remove('active');
+  }
 
-  document.getElementById('save-profile-btn').onclick = async () => {
-    const p = window.cloudSync ? window.cloudSync.profile : null;
-    if (!p) return;
-    const nickInp = document.getElementById('input-nickname');
-    const passInp = document.getElementById('input-profile-password');
-    const newNick = (nickInp ? nickInp.value.trim() : '') || p.nickname || '鍵盤小英雄';
-    const newPass = passInp ? passInp.value.trim() : '';
+  const saveProfileBtn = document.getElementById('save-profile-btn');
+  if (saveProfileBtn) {
+    saveProfileBtn.onclick = async () => {
+      const p = window.cloudSync ? window.cloudSync.profile : null;
+      if (!p) return;
+      const nickInp = document.getElementById('input-nickname');
+      const passInp = document.getElementById('input-profile-password');
+      const newNick = (nickInp ? nickInp.value.trim() : '') || p.nickname || '鍵盤小英雄';
+      const newPass = passInp ? passInp.value.trim() : '';
 
-    p.nickname = newNick;
-    if (newPass) {
-      p.password = newPass;
-    }
-    window.cloudSync.profile = p;
-    localStorage.setItem(window.cloudSync.storageKey, JSON.stringify(p));
-    window.cloudSync.updateProfileBadgeUI();
+      p.nickname = newNick;
+      if (newPass) {
+        p.password = newPass;
+      }
+      window.cloudSync.profile = p;
+      localStorage.setItem(window.cloudSync.storageKey, JSON.stringify(p));
+      window.cloudSync.updateProfileBadgeUI();
 
-    if (window.cloudSync.isFirebaseReady) {
-      await window.cloudSync.syncProfileToCloud();
-    }
-    if (window.shopManager) window.shopManager.updateUI();
-    profileModal.classList.remove('active');
-    if (window.cloudSync.showToast) {
-      window.cloudSync.showToast('✅ 暱稱與通行密碼已更新！', 'success');
-    } else {
-      alert('✅ 暱稱與通行密碼已更新！');
-    }
-  };
+      if (window.cloudSync.isFirebaseReady) {
+        await window.cloudSync.syncProfileToCloud();
+      }
+      if (window.shopManager) window.shopManager.updateUI();
+      if (profileModal) profileModal.classList.remove('active');
+      if (window.cloudSync.showToast) {
+        window.cloudSync.showToast('✅ 暱稱與通行密碼已更新！', 'success');
+      } else {
+        alert('✅ 暱稱與通行密碼已更新！');
+      }
+    };
+  }
+
+  // 綁定頂部導覽列與個人面板中的登出按鈕
+  const navLogoutBtn = document.getElementById('nav-btn-logout');
+  if (navLogoutBtn) {
+    navLogoutBtn.onclick = () => window.studentLogout();
+  }
+
+  const profileLogoutBtn = document.getElementById('profile-logout-btn');
+  if (profileLogoutBtn) {
+    profileLogoutBtn.onclick = () => window.studentLogout();
+  }
 
   // 2. 學生登載資料歡迎彈窗 (首頁載入)
   const loginModal = document.getElementById('modal-student-login');
@@ -2124,7 +2203,7 @@ function initModals() {
         // 更新後臺面板上的目前密碼提示
         const currentPwdHint = document.getElementById('admin-current-pwd-hint');
         if (currentPwdHint && window.cloudSync) {
-          currentPwdHint.innerText = window.cloudSync.getAdminPassword();
+          currentPwdHint.innerText = '••••';
         }
 
         // 自動執行一次 Firebase 即時連線診斷
@@ -2522,19 +2601,19 @@ async function loadStudentsForClass(className) {
       <thead>
         <tr>
           <th style="width: 50px;">座號</th>
-          <th>暱稱 / 姓名</th>
+          <th>姓名 / 暱稱</th>
           <th style="width: 90px;">通行密碼</th>
-          <th style="width: 65px;">等級</th>
-          <th style="width: 75px;">星幣</th>
-          <th style="width: 80px; text-align: center;">操作</th>
+          <th style="width: 60px;">等級</th>
+          <th style="width: 70px;">星幣</th>
+          <th style="width: 175px; text-align: center;">操作</th>
         </tr>
       </thead>
       <tbody>
   `;
 
   list.forEach(stu => {
-    const seat = stu.seatNumber || '00';
-    const nickname = stu.nickname ? stu.nickname : '<span style="color:var(--text-muted); font-style:italic;">尚未設定</span>';
+    const seat = stu.seatNumber || '0';
+    const nameDisplay = stu.realName ? (stu.nickname ? `<strong>${stu.realName}</strong> <span style="font-size:0.75rem; color:var(--text-muted);">(${stu.nickname})</span>` : `<strong>${stu.realName}</strong>`) : (stu.nickname ? `<strong>${stu.nickname}</strong>` : '<span style="color:var(--text-muted); font-style:italic;">尚未設定</span>');
     const pwd = stu.password || '無';
     const level = stu.level || 1;
     const coins = stu.coins || 0;
@@ -2542,14 +2621,22 @@ async function loadStudentsForClass(className) {
     tableHtml += `
       <tr>
         <td style="font-weight:bold; color:var(--brand-primary);">${seat}號</td>
-        <td><strong>${nickname}</strong></td>
+        <td>${nameDisplay}</td>
         <td><span class="admin-pwd-badge" title="學生通行密碼">${pwd}</span></td>
         <td>Lv.${level}</td>
-        <td>💰 ${coins}</td>
-        <td style="text-align:center;">
-          <button class="admin-btn-action-mini btn-reset-pwd" data-seat="${seat}" data-name="${stu.nickname || ''}" data-pwd="${pwd}" title="重設此學生密碼">
-            🔑 修改
-          </button>
+        <td>🪙 ${coins}</td>
+        <td style="text-align:center; white-space:nowrap;">
+          <div style="display:flex; gap:0.25rem; justify-content:center;">
+            <button class="admin-btn-action-mini btn-reset-pwd" data-seat="${seat}" data-name="${stu.realName || stu.nickname || ''}" data-pwd="${pwd}" title="修改學生密碼">
+              ✏️ 密碼
+            </button>
+            <button class="admin-btn-action-mini btn-unbind-mini" data-seat="${seat}" data-name="${stu.realName || stu.nickname || ''}" style="border-color:rgba(245,158,11,0.5); color:#fbbf24;" title="解除他人冒用綁定">
+              🔓 解綁
+            </button>
+            <button class="admin-btn-action-mini btn-delete-mini" data-seat="${seat}" data-name="${stu.realName || stu.nickname || ''}" style="border-color:rgba(239,68,68,0.5); color:#f87171;" title="徹底刪除此檔案">
+              🗑️ 刪除
+            </button>
+          </div>
         </td>
       </tr>
     `;
@@ -2562,13 +2649,13 @@ async function loadStudentsForClass(className) {
 
   container.innerHTML = tableHtml;
 
-  // 綁定重設密碼按鈕事件
+  // 1. 綁定重設密碼按鈕事件
   container.querySelectorAll('.btn-reset-pwd').forEach(btn => {
     btn.onclick = async () => {
       const seat = btn.dataset.seat;
       const sName = btn.dataset.name || `${seat}號學生`;
       const oldPwd = btn.dataset.pwd !== '無' ? btn.dataset.pwd : '';
-      const input = prompt(`【密碼維護】請輸入 ${className} ${seat}號（${sName}）的新通行密碼：`, oldPwd || '1234');
+      const input = prompt(`【密碼維護】請輸入 ${className} ${seat}號（${sName}）的新通行密碼：`, oldPwd || '');
       if (input !== null) {
         const newPwd = input.trim();
         if (!newPwd) {
@@ -2584,8 +2671,44 @@ async function loadStudentsForClass(className) {
         } else {
           alert('❌ 密碼變更失敗，請確認 Firebase 網路連線狀態。');
           btn.disabled = false;
-          btn.innerText = '🔑 修改';
+          btn.innerText = '✏️ 密碼';
         }
+      }
+    };
+  });
+
+  // 2. 綁定解除綁定按鈕事件
+  container.querySelectorAll('.btn-unbind-mini').forEach(btn => {
+    btn.onclick = async () => {
+      const seat = btn.dataset.seat;
+      const sName = btn.dataset.name || `${seat}號`;
+      if (!confirm(`確定要解除【${className} ${seat}號（${sName}）】的身分綁定嗎？\n\n此操作將清空冒用者所設定的密碼與自訂暱稱，並保留學籍姓名。`)) return;
+      btn.disabled = true;
+      const ok = await window.cloudSync.adminUnbindStudent(className, seat);
+      if (ok) {
+        alert(`✅ 已成功解除【${className} ${seat}號】的冒用綁定！`);
+        loadStudentsForClass(className);
+      } else {
+        alert('❌ 解除綁定失敗，請確認網路連線。');
+        btn.disabled = false;
+      }
+    };
+  });
+
+  // 3. 綁定刪除按鈕事件
+  container.querySelectorAll('.btn-delete-mini').forEach(btn => {
+    btn.onclick = async () => {
+      const seat = btn.dataset.seat;
+      const sName = btn.dataset.name || `${seat}號`;
+      if (!confirm(`⚠️ 確定要徹底「刪除」【${className} ${seat}號（${sName}）】的雲端存檔嗎？\n刪除後紀錄將被完全清除。`)) return;
+      btn.disabled = true;
+      const ok = await window.cloudSync.adminDeleteStudent(className, seat);
+      if (ok) {
+        alert(`✅ 已刪除【${className} ${seat}號】學生資料！`);
+        loadStudentsForClass(className);
+      } else {
+        alert('❌ 刪除失敗，請確認網路連線。');
+        btn.disabled = false;
       }
     };
   });

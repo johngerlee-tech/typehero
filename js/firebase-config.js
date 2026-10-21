@@ -127,7 +127,7 @@ class CloudSyncManager {
     }
     return {
       className: '5年3班',
-      seatNumber: '01',
+      seatNumber: '',
       nickname: '',
       password: '',
       hasRegistered: false
@@ -137,7 +137,7 @@ class CloudSyncManager {
   saveProfile(className, seatNumber, nickname, password) {
     this.profile = { 
       className: String(className).trim() || '5年3班', 
-      seatNumber: String(seatNumber).padStart(2, '0'), 
+      seatNumber: String(seatNumber).trim(), 
       nickname: String(nickname || '').trim(), 
       password: password !== undefined ? String(password).trim() : (this.profile ? (this.profile.password || '') : ''),
       hasRegistered: true 
@@ -822,7 +822,12 @@ class CloudSyncManager {
       });
 
       // 依座號排序
-      list.sort((a, b) => Number(a.seatNumber || 0) - Number(b.seatNumber || 0));
+      list.sort((a, b) => {
+        const numA = parseInt(a.seatNumber, 10);
+        const numB = parseInt(b.seatNumber, 10);
+        if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+        return String(a.seatNumber || '').localeCompare(String(b.seatNumber || ''));
+      });
       return list;
     } catch (e) {
       console.error('拉取班級學生名冊失敗:', e);
@@ -844,6 +849,73 @@ class CloudSyncManager {
       return true;
     } catch (e) {
       console.error('教師後臺修改學生密碼失敗:', e);
+      return false;
+    }
+  }
+
+  /**
+   * 解除學生身分綁定 (解除他人冒用該座號之密碼與暱稱，保留真實姓名與學號)
+   */
+  async adminUnbindStudent(className, seatNumber, realName = '', studentNo = '') {
+    if (!this.isFirebaseReady || !this.db) return false;
+    const cleanSeat = String(seatNumber).trim();
+    const studentId = `${className}_${cleanSeat}`;
+    try {
+      let keepRealName = realName;
+      let keepStudentNo = studentNo;
+      let academicYear = '115';
+
+      try {
+        const docSnap = await this.db.collection('students').doc(studentId).get();
+        if (docSnap.exists) {
+          const d = docSnap.data();
+          if (!keepRealName && d.realName) keepRealName = d.realName;
+          if (!keepStudentNo && d.studentNo) keepStudentNo = d.studentNo;
+          if (d.academicYear) academicYear = d.academicYear;
+        }
+      } catch (err) {
+        console.warn('讀取既有學生資料以便保留學籍:', err);
+      }
+
+      await this.db.collection('students').doc(studentId).set({
+        className: className,
+        seatNumber: cleanSeat,
+        password: '',
+        nickname: '',
+        realName: keepRealName || '',
+        studentNo: keepStudentNo || '',
+        academicYear: academicYear,
+        level: 1,
+        coins: 100,
+        xp: 0,
+        items: [],
+        unlockedLessons: [],
+        achievements: [],
+        status: 'active',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log(`✅ 已解除 [${studentId}] 冒用綁定並還原基本學籍`);
+      return true;
+    } catch (e) {
+      console.error('解除學生綁定失敗:', e);
+      return false;
+    }
+  }
+
+  /**
+   * 徹底刪除指定座號之學生雲端存檔
+   */
+  async adminDeleteStudent(className, seatNumber) {
+    if (!this.isFirebaseReady || !this.db) return false;
+    const cleanSeat = String(seatNumber).trim();
+    const studentId = `${className}_${cleanSeat}`;
+    try {
+      await this.db.collection('students').doc(studentId).delete();
+      console.log(`✅ 已從 Firestore 刪除學生檔案 [${studentId}]`);
+      return true;
+    } catch (e) {
+      console.error('刪除學生失敗:', e);
       return false;
     }
   }

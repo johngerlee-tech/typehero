@@ -260,10 +260,10 @@
             👑 系統最高管理員登入
           </h4>
           <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 0.85rem;">
-            具備修改全校班級名稱清單與清空排行榜之最高權限。（預設密碼：1234）
+            具備修改全校班級名稱清單與清空排行榜之最高權限。
           </p>
           <form id="form-admin-pwd-login" onsubmit="return false;" style="display:flex; gap:0.5rem;">
-            <input type="password" id="input-admin-pwd-login" class="form-input" placeholder="請輸入管理密碼 (預設 1234)" style="flex:1;" required>
+            <input type="password" id="input-admin-pwd-login" class="form-input" placeholder="請輸入管理密碼" style="flex:1;" required>
             <button type="submit" id="btn-submit-pwd-login" class="btn-primary" style="padding:0.65rem 1.2rem; flex-shrink:0;">
               登入 ➔
             </button>
@@ -367,7 +367,7 @@
         </div>
 
         <!-- 卡片 2: 班級學生帳號與通行密碼管理 (需求 7: 查閱密碼與協助修改) -->
-        <div class="admin-card" style="border-color: rgba(99, 102, 241, 0.4);">
+        <div id="card-students-management" class="admin-card" style="grid-column: 1 / -1; border-color: rgba(99, 102, 241, 0.4);">
           <div class="admin-card-header">
             <div class="admin-card-title" style="color:var(--brand-primary);">
               <span>👥</span> 學生帳號與通行密碼管理 (防止冒用/重設密碼)
@@ -423,11 +423,19 @@
             <div id="admin-class-passcode-status-msg" style="font-size:0.72rem; margin-top:0.35rem; display:none;"></div>
           </div>
 
-          <p style="font-size:0.74rem; color:var(--text-muted); margin-bottom:0.75rem;">
-            若學生忘記密碼或換電腦無法登入，老師可在此查閱學生密碼或點擊「修改」為學生重設新密碼：
-          </p>
+          <!-- 授課教師專屬操作說明與救援指南 -->
+          <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 0.85rem; font-size: 0.75rem; line-height: 1.5; color: var(--text-main);">
+            <div style="font-weight: 800; color: #818cf8; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem;">
+              <span>🛡️ 上課教師課堂即時處置功能（授課教師與管理者完全可用）：</span>
+            </div>
+            <div style="color: var(--text-muted);">
+              • <strong style="color: var(--brand-primary);">✏️ 修改密碼</strong>：學生忘記密碼或換電腦無法登入時，老師可直接為其重設新密碼。<br>
+              • <strong style="color: #fbbf24;">🔓 解除綁定</strong>：<strong>【及時解決冒用】</strong>若座號遭其他非本班同學或他人亂登入占用，老師點擊「解除綁定」即可<strong>立即清空冒用之密碼與暱稱</strong>，並<strong>完整保留名冊真實姓名與學號學籍</strong>，讓該座號同學能當場順利登入！<br>
+              • <strong style="color: #f87171;">🗑️ 刪除</strong>：若有重複建置或錯誤的座號檔案，可直接點擊刪除清理存檔。
+            </div>
+          </div>
 
-          <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: rgba(15, 23, 42, 0.5);">
+          <div style="max-height: 480px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: rgba(15, 23, 42, 0.5);">
             <table class="students-table">
               <thead>
                 <tr>
@@ -438,7 +446,7 @@
                   <th style="width: 60px;">等級</th>
                   <th style="width: 75px;">星幣</th>
                   <th>通行密碼</th>
-                  <th style="width: 80px; text-align:center;">操作</th>
+                  <th style="width: 220px; text-align:center;">帳號管理操作</th>
                 </tr>
               </thead>
               <tbody id="admin-students-table-body">
@@ -897,7 +905,7 @@
   </footer>
 
   <!-- 模組腳本載入 (版本號防快取) -->
-  <script src="js/firebase-config.js?v=2.7.0"></script>
-  <script src="js/admin.js?v=2.7.0"></script>
+  <script src="js/firebase-config.js?v=2.8.0"></script>
+  <script src="js/admin.js?v=2.8.0"></script>
 </body>
 </html>
