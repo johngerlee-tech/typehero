@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
-  <link rel="stylesheet" href="css/styles.css?v=2.9.0">
+  <link rel="stylesheet" href="css/styles.css?v=2.9.1">
   
   <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -469,10 +469,10 @@
         </div>
 
         <!-- 多元評價榜單分頁 (Proposal V.1: 神速榜、百步穿楊準確榜、勤學毅力榜) -->
-        <div class="leaderboard-tabs" style="display:flex; gap:0.4rem; margin-bottom:0.85rem; flex-wrap:wrap;">
-          <button class="shop-tab-btn active" id="lb-tab-wpm" data-lb-type="wpm" style="font-size:0.78rem; padding:0.35rem 0.75rem;">⚡ 全校神速榜 (WPM)</button>
-          <button class="shop-tab-btn" id="lb-tab-accuracy" data-lb-type="accuracy" style="font-size:0.78rem; padding:0.35rem 0.75rem;">🎯 百步穿楊 (100%準確率)</button>
-          <button class="shop-tab-btn" id="lb-tab-diligence" data-lb-type="diligence" style="font-size:0.78rem; padding:0.35rem 0.75rem;">🛡️ 勤學毅力榜</button>
+        <div class="leaderboard-tabs" style="display:flex; gap:0.45rem; margin-bottom:0.85rem; width:100%;">
+          <button class="lb-tab-btn active" id="lb-tab-wpm" data-lb-type="wpm">⚡ 全校神速榜 (WPM)</button>
+          <button class="lb-tab-btn" id="lb-tab-accuracy" data-lb-type="accuracy">🎯 百步穿楊 (100%準確率)</button>
+          <button class="lb-tab-btn" id="lb-tab-diligence" data-lb-type="diligence">🛡️ 勤學毅力榜</button>
         </div>
 
         <div class="leaderboard-list" id="leaderboard-list">
@@ -887,10 +887,10 @@
   </footer>
 
   <!-- 核心模組腳本載入 (加入版本控制防止快取) -->
-  <script src="js/audio.js?v=3.1.0"></script>
+  <script src="js/audio.js?v=3.2.0"></script>
   <script src="js/lessons.js?v=2.5.2"></script>
-  <script src="js/shop.js?v=3.1.0"></script>
-  <script src="js/firebase-config.js?v=3.1.0"></script>
-  <script src="js/app.js?v=3.1.0"></script>
+  <script src="js/shop.js?v=3.2.0"></script>
+  <script src="js/firebase-config.js?v=3.2.0"></script>
+  <script src="js/app.js?v=3.2.0"></script>
 </body>
 </html>

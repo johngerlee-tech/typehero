@@ -1915,18 +1915,30 @@ function initModals() {
 
   // 排行榜彈窗 (Proposal IV.4 多元榮譽評價榜單)
   const leaderModal = document.getElementById('modal-leaderboard');
-  document.getElementById('nav-btn-leaderboard').onclick = async () => {
-    leaderModal.classList.add('active');
-    await renderLeaderboard('wpm');
-  };
-  document.getElementById('close-leader-btn').onclick = () => leaderModal.classList.remove('active');
+  const navBtnLeader = document.getElementById('nav-btn-leaderboard');
+  if (navBtnLeader && leaderModal) {
+    navBtnLeader.onclick = async () => {
+      leaderModal.classList.add('active');
+      await renderLeaderboard(currentLeaderboardTab || 'wpm');
+    };
+  }
+  const closeLeaderBtn = document.getElementById('close-leader-btn');
+  if (closeLeaderBtn && leaderModal) {
+    closeLeaderBtn.onclick = () => leaderModal.classList.remove('active');
+  }
 
-  const lbWpm = document.getElementById('lb-tab-wpm');
-  const lbAcc = document.getElementById('lb-tab-accuracy');
-  const lbDil = document.getElementById('lb-tab-diligence');
-  if (lbWpm) lbWpm.onclick = () => renderLeaderboard('wpm');
-  if (lbAcc) lbAcc.onclick = () => renderLeaderboard('accuracy');
-  if (lbDil) lbDil.onclick = () => renderLeaderboard('diligence');
+  // 榜單三大分類按鈕點擊事件綁定 (神速、百步穿楊、勤學毅力)
+  const lbTabs = document.querySelectorAll('.lb-tab-btn');
+  lbTabs.forEach(btn => {
+    btn.onclick = async (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const type = btn.dataset.lbType || 'wpm';
+      await renderLeaderboard(type);
+    };
+  });
 
   // 學生主動登出帳號機制 (支援頂部導航 🚪、個人設定彈窗、頁尾切換)
   window.studentLogout = async function(skipConfirm = false) {
@@ -2893,7 +2905,7 @@ async function loadStudentsForClass(className) {
 // 13. 商城項目渲染 (大貼紙視覺設計)
 // ----------------------------------------------------
 function initShopUI() {
-  const shopTabs = document.querySelectorAll('.shop-tab-btn');
+  const shopTabs = document.querySelectorAll('.shop-tabs .shop-tab-btn');
   shopTabs.forEach(btn => {
     btn.onclick = () => {
       shopTabs.forEach(b => b.classList.remove('active'));
@@ -2961,7 +2973,7 @@ async function renderLeaderboard(type = currentLeaderboardTab) {
   const container = document.getElementById('leaderboard-list');
   if (!container) return;
 
-  // 更新分頁按鈕視覺狀態
+  // 更新分頁按鈕視覺狀態 (加上/移除 active class)
   const tabMap = {
     'wpm': document.getElementById('lb-tab-wpm'),
     'accuracy': document.getElementById('lb-tab-accuracy'),
@@ -2972,42 +2984,43 @@ async function renderLeaderboard(type = currentLeaderboardTab) {
     const btn = tabMap[key];
     if (btn) {
       if (key === type) {
-        btn.style.background = 'var(--brand-primary)';
-        btn.style.color = '#fff';
-        btn.style.borderColor = 'var(--brand-primary)';
+        btn.classList.add('active');
       } else {
-        btn.style.background = 'transparent';
-        btn.style.color = 'var(--text-muted)';
-        btn.style.borderColor = 'var(--border-color)';
+        btn.classList.remove('active');
       }
     }
   });
 
-  container.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text-muted);">正在載入即時榮譽榜...</div>';
+  container.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.88rem;">正在載入即時榮譽榜...</div>';
 
   if (!window.cloudSync) {
     container.innerHTML = '<div style="text-align:center; padding:1.5rem; color:#ef4444;">雲端模組未載入</div>';
     return;
   }
 
-  const rawList = await window.cloudSync.fetchTopScores(30);
+  let list = [];
 
-  let filtered = [...rawList];
-  if (type === 'wpm') {
-    // 神速榜：依 WPM 降序
-    filtered.sort((a, b) => (b.wpm || 0) - (a.wpm || 0));
-  } else if (type === 'accuracy') {
-    // 百步穿楊榜：100% 準確率優先，次之按 WPM
-    filtered = filtered.filter(item => (item.accuracy || 0) >= 95);
-    filtered.sort((a, b) => (b.accuracy || 0) - (a.accuracy || 0) || (b.wpm || 0) - (a.wpm || 0));
-  } else if (type === 'diligence') {
-    // 勤學毅力榜：依累積練習按鍵總數或星星數
-    filtered.sort((a, b) => ((b.stars || 0) + (b.totalKeys || 0)) - ((a.stars || 0) + (a.totalKeys || 0)) || (b.wpm || 0) - (a.wpm || 0));
+  try {
+    if (type === 'wpm') {
+      const rawList = await window.cloudSync.fetchTopScores(30);
+      const sorted = [...rawList].sort((a, b) => (Number(b.wpm) || 0) - (Number(a.wpm) || 0));
+      list = sorted.slice(0, 10);
+    } else if (type === 'accuracy') {
+      const rawList = (typeof window.cloudSync.fetchTopAccuracy === 'function')
+        ? await window.cloudSync.fetchTopAccuracy(30)
+        : await window.cloudSync.fetchTopScores(30);
+      const sorted = [...rawList].sort((a, b) => (Number(b.accuracy) || 0) - (Number(a.accuracy) || 0) || (Number(b.wpm) || 0) - (Number(a.wpm) || 0));
+      list = sorted.slice(0, 10);
+    } else if (type === 'diligence') {
+      list = (typeof window.cloudSync.fetchTopDiligence === 'function')
+        ? await window.cloudSync.fetchTopDiligence(10)
+        : [];
+    }
+  } catch (err) {
+    console.error('拉取排行榜錯誤:', err);
   }
 
-  const list = filtered.slice(0, 10);
-
-  if (list.length === 0) {
+  if (!list || list.length === 0) {
     container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text-muted); font-size:0.85rem;">目前尚無符合此評價維度的紀錄，快來搶先上榜！</div>';
     return;
   }
@@ -3020,19 +3033,38 @@ async function renderLeaderboard(type = currentLeaderboardTab) {
 
     const row = document.createElement('div');
     row.className = 'leaderboard-row';
-    row.innerHTML = `
-      <div style="display:flex; align-items:center; gap:0.75rem;">
-        <span class="leaderboard-rank ${rankClass}">${crown}${rank}</span>
-        <div>
-          <div style="font-weight:bold;">${item.nickname} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${item.className || '學生'})</span></div>
-          <div style="font-size:0.72rem; color:var(--text-muted);">${item.lessonTitle || '打字特訓'}</div>
-        </div>
-      </div>
-      <div style="text-align:right;">
-        <div style="font-size:1.1rem; font-weight:800; color:var(--brand-primary);">${item.wpm} <span style="font-size:0.7rem;">字/分 (WPM)</span></div>
-        <div style="font-size:0.72rem; color:#10b981; font-weight:600;">輸入準確率 ${item.accuracy}%</div>
-      </div>
-    `;
+
+    let rightColHtml = '';
+    if (type === 'wpm') {
+      rightColHtml = '<div style="font-size:1.15rem; font-weight:800; color:var(--brand-primary);">' + (item.wpm || 0) + ' <span style="font-size:0.7rem;">WPM</span></div>' +
+        '<div style="font-size:0.74rem; color:#10b981; font-weight:600;">🎯 準確率 ' + (item.accuracy || 0) + '%</div>';
+    } else if (type === 'accuracy') {
+      const isPerfect = (Number(item.accuracy) || 0) >= 100;
+      const accColor = isPerfect ? '#10b981' : '#38bdf8';
+      const perfectBadge = isPerfect ? '<span style="background:#10b981; color:#fff; font-size:0.65rem; padding:0.12rem 0.4rem; border-radius:4px; margin-left:4px; font-weight:800;">完美零失誤</span>' : '';
+      rightColHtml = '<div style="font-size:1.15rem; font-weight:800; color:' + accColor + ';">' + (item.accuracy || 0) + '% ' + perfectBadge + '</div>' +
+        '<div style="font-size:0.74rem; color:var(--text-muted); font-weight:600;">⚡ 打字速度 ' + (item.wpm || 0) + ' WPM</div>';
+    } else if (type === 'diligence') {
+      const expVal = item.exp || ((item.stars || 0) * 35) || 0;
+      rightColHtml = '<div style="font-size:1.15rem; font-weight:800; color:#f59e0b;">⭐ ' + expVal + ' <span style="font-size:0.7rem;">EXP</span></div>' +
+        '<div style="font-size:0.74rem; color:#fbbf24; font-weight:600;">🪙 ' + (item.coins || 0) + ' 幣 · 🏅 Lv.' + (item.level || 1) + '</div>';
+    }
+
+    const nickname = item.nickname || '學生';
+    const className = item.className || '本校';
+    const title = item.lessonTitle || '打字特訓';
+
+    row.innerHTML = '<div style="display:flex; align-items:center; gap:0.75rem;">' +
+      '<span class="leaderboard-rank ' + rankClass + '">' + crown + rank + '</span>' +
+      '<div>' +
+        '<div style="font-weight:bold; font-size:0.92rem; color:var(--text-main);">' + nickname + ' <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(' + className + ')</span></div>' +
+        '<div style="font-size:0.74rem; color:var(--text-muted);">' + title + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="text-align:right;">' +
+      rightColHtml +
+    '</div>';
+
     container.appendChild(row);
   });
 }

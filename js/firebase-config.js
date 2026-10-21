@@ -1556,6 +1556,112 @@ class CloudSyncManager {
     ];
   }
 
+  // 抓取百步穿楊準確率英雄榜 (100% 準確率優先，次之按 WPM)
+  async fetchTopAccuracy(limitCount = 15) {
+    if (this.isFirebaseReady && this.db) {
+      try {
+        const snapshot = await this.db.collection('leaderboard')
+          .orderBy('accuracy', 'desc')
+          .limit(limitCount * 2)
+          .get();
+
+        const results = [];
+        snapshot.forEach(doc => results.push(doc.data()));
+        if (results.length > 0) {
+          results.sort((a, b) => (b.accuracy || 0) - (a.accuracy || 0) || (b.wpm || 0) - (a.wpm || 0));
+          return results.slice(0, limitCount);
+        }
+      } catch (e) {
+        console.warn('從雲端拉取準確率排行榜失敗，使用本機或備援紀錄', e);
+      }
+    }
+
+    try {
+      const localBoard = JSON.parse(localStorage.getItem('typehero_local_leaderboard') || '[]');
+      if (localBoard.length > 0) {
+        const sorted = [...localBoard].sort((a, b) => (b.accuracy || 0) - (a.accuracy || 0) || (b.wpm || 0) - (a.wpm || 0));
+        return sorted.slice(0, limitCount);
+      }
+    } catch (e) {}
+
+    return [
+      { nickname: '神射手綠箭', className: '6年1班', wpm: 65, accuracy: 100, lessonTitle: '百步穿楊完美盲打' },
+      { nickname: '零失誤精靈', className: '5年2班', wpm: 58, accuracy: 100, lessonTitle: '注音聲調全對特訓' },
+      { nickname: '專注小學者', className: '4年1班', wpm: 52, accuracy: 100, lessonTitle: '全形標點零失誤' },
+      { nickname: '太極沉著貓', className: '6年3班', wpm: 46, accuracy: 99, lessonTitle: '基礎食指鍵位' },
+      { nickname: '穩健小蝸牛', className: '3年3班', wpm: 40, accuracy: 98, lessonTitle: '常用生字詞練習' }
+    ];
+  }
+
+  // 抓取勤學毅力榜 (依累積經驗值、星幣與通關數)
+  async fetchTopDiligence(limitCount = 15) {
+    if (this.isFirebaseReady && this.db) {
+      try {
+        const snapshot = await this.db.collection('students')
+          .orderBy('exp', 'desc')
+          .limit(limitCount)
+          .get();
+
+        const results = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data && ((Number(data.exp) || 0) > 0 || (Number(data.coins) || 0) > 0)) {
+            const starsCount = (data.lessonStars && typeof data.lessonStars === 'object')
+              ? Object.values(data.lessonStars).reduce((sum, v) => sum + (Number(v) || 0), 0)
+              : 0;
+            const displayName = data.nickname || ((data.className || '') + ' ' + (data.seatNumber || '') + '號');
+            results.push({
+              nickname: displayName,
+              className: data.className || '學生',
+              seatNumber: data.seatNumber || '',
+              exp: Number(data.exp) || 0,
+              coins: Number(data.coins) || 0,
+              level: Number(data.level) || 1,
+              stars: starsCount,
+              lessonTitle: '累積經驗值 ' + (data.exp || 0) + ' EXP'
+            });
+          }
+        });
+        if (results.length > 0) {
+          return results;
+        }
+      } catch (e) {
+        console.warn('從雲端拉取勤學毅力榜失敗，使用本機或備援紀錄', e);
+      }
+    }
+
+    const list = [
+      { nickname: '勤學小松鼠', className: '5年2班', exp: 1250, coins: 480, level: 6, stars: 36, lessonTitle: '累積通關 36 關卡' },
+      { nickname: '晨光讀書貓', className: '6年1班', exp: 1080, coins: 390, level: 5, stars: 31, lessonTitle: '累積通關 31 關卡' },
+      { nickname: '鍵盤冒險家', className: '4年3班', exp: 920, coins: 310, level: 4, stars: 25, lessonTitle: '累積通關 25 關卡' },
+      { nickname: '努力不懈熊', className: '5年4班', exp: 780, coins: 260, level: 4, stars: 22, lessonTitle: '累積通關 22 關卡' },
+      { nickname: '星空漫步者', className: '3年2班', exp: 640, coins: 200, level: 3, stars: 18, lessonTitle: '累積通關 18 關卡' }
+    ];
+
+    const curP = this.profile;
+    const curExp = (window.shopManager && window.shopManager.data) ? window.shopManager.data.exp : 0;
+    const curCoins = (window.shopManager && window.shopManager.data) ? window.shopManager.data.coins : 0;
+    const curLevel = (window.shopManager && window.shopManager.data) ? window.shopManager.data.level : 1;
+    const curStars = (window.shopManager && window.shopManager.data && window.shopManager.data.lessonStars)
+      ? Object.values(window.shopManager.data.lessonStars).reduce((sum, v) => sum + (Number(v) || 0), 0)
+      : 0;
+
+    if (curP && curP.hasRegistered && curExp > 0) {
+      list.push({
+        nickname: curP.nickname || (curP.className + ' ' + curP.seatNumber + '號'),
+        className: curP.className,
+        exp: curExp,
+        coins: curCoins,
+        level: curLevel,
+        stars: curStars,
+        lessonTitle: '累積經驗值 ' + curExp + ' EXP'
+      });
+      list.sort((a, b) => b.exp - a.exp);
+    }
+
+    return list.slice(0, limitCount);
+  }
+
   // 輕量級提示小窗
   showToast(message, type = 'info') {
     let toast = document.getElementById('typehero-global-toast');
