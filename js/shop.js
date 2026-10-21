@@ -37,14 +37,29 @@ class ShopManager {
         { id: 'chime', name: '夢幻水晶風鈴', price: 650, preview: '🔔', desc: '晶瑩剔透的八音盒風鈴，每一下敲擊如星塵滑落' }
       ],
       avatars: [
-        { id: 'cat', name: '探險貓咪', price: 0, preview: '🐱', desc: '好奇心滿滿的打字小學徒' },
-        { id: 'shiba', name: '雷霆柴犬', price: 100, preview: '🐶', desc: '元氣充沛，打字絕不卡關！' },
-        { id: 'astronaut', name: '星際太空人', price: 200, preview: '🚀', desc: '勇往直前，探索鍵盤宇宙' },
-        { id: 'robot', name: '科技機甲', price: 350, preview: '🤖', desc: '精準無誤，零失誤率運算核心' },
-        { id: 'wizard', name: '魔法鍵術士', price: 500, preview: '🧙‍♂️', desc: '指尖生風，鍵盤化作魔法杖' },
-        { id: 'dragon', name: '烈焰祥龍', price: 600, preview: '🐲', desc: '霸氣威武的祥龍化身，鍵盤騰雲駕霧無人能擋！' },
-        { id: 'unicorn', name: '夢幻獨角獸', price: 750, preview: '🦄', desc: '象徵純淨神速的傳奇神獸，七彩流光奔馳在按鍵間！' },
-        { id: 'crown', name: '鍵盤神話至尊', price: 800, preview: '👑', desc: '登上打字神壇的最高榮譽徽章' }
+        { id: 'knight', name: '聖殿騎士', price: 0, preview: '🛡️', desc: '堅毅勇敢的鍵盤守護者，以絕對防禦守護打字準確率' },
+        { id: 'warrior', name: '勇者劍士', price: 100, preview: '⚔️', desc: '熱血無畏的冒險先鋒，一往直前劈開字詞難關' },
+        { id: 'archer', name: '精靈遊俠', price: 180, preview: '🏹', desc: '百步穿楊神射手，指尖出箭百發百中零失誤' },
+        { id: 'mage', name: '元素法師', price: 260, preview: '🔮', desc: '掌控冰火奧術，鍵盤化作魔法杖施展疾風咒語' },
+        { id: 'ninja', name: '暗影忍者', price: 350, preview: '🥷', desc: '神出鬼沒疾風幻影，極速連擊瞬息破百WPM' },
+        { id: 'paladin', name: '光明聖騎', price: 450, preview: '⚜️', desc: '沐浴神聖榮光，堅毅不屈引領冒險團隊' },
+        { id: 'monk', name: '武道宗師', price: 550, preview: '🥋', desc: '拳掌生風心手合一，擊鍵如疾風驟雨行雲流水' },
+        { id: 'valkyrie', name: '天界女武神', price: 680, preview: '🪽', desc: '展翼翱翔九天，傳說中的勝利之翼神速無雙' },
+        { id: 'king', name: '傳奇帝王', price: 800, preview: '👑', desc: '加冕為王統治打字神殿，受萬千英雄景仰' }
+      ],
+      pets: [
+        { id: 'shiba', name: '元氣柴犬', price: 0, preview: '🐶', desc: '元氣滿滿搖尾巴，打字累了隨時為你加油打氣！' },
+        { id: 'cat', name: '招財橘貓', price: 80, preview: '🐱', desc: '呼嚕呼嚕趴在身邊，帶來滿滿的打字幸運與星幣！' },
+        { id: 'fox', name: '星空靈狐', price: 150, preview: '🦊', desc: '聰慧靈動的小狐狸，眼神專注陪你辨識每個注音鍵位' },
+        { id: 'rabbit', name: '櫻花玉兔', price: 220, preview: '🐰', desc: '輕盈敏捷蹦蹦跳跳，陪伴你的手速如脫兔般飛躍' },
+        { id: 'panda', name: '軟萌熊貓', price: 280, preview: '🐼', desc: '圓滾滾的國寶小可愛，抱著竹子悠哉陪你無壓力練習' },
+        { id: 'wolf', name: '疾風戰狼', price: 360, preview: '🐺', desc: '忠誠勇猛的荒野夥伴，守護每一次連擊決不中斷' },
+        { id: 'penguin', name: '極地企鵝', price: 420, preview: '🐧', desc: '搖搖擺擺的冰雪紳士，冷靜沈著提醒你保持100%準確率' },
+        { id: 'owl', name: '智者白鴞', price: 500, preview: '🦉', desc: '夜行智慧森林導師，目光如炬指引盲打最佳手位' },
+        { id: 'dragon', name: '烈焰赤龍', price: 600, preview: '🐲', desc: '威風凜凜的東方小幼龍，吐出火熱鬥志點燃你的打字魂' },
+        { id: 'unicorn', name: '彩虹獨角獸', price: 700, preview: '🦄', desc: '踏著雲朵與星辰而來，散發夢幻七彩光芒的神聖夥伴' },
+        { id: 'dolphin', name: '海藍海豚', price: 780, preview: '🐬', desc: '在大海乘風破浪，以最流暢的節奏陪伴你的指尖起伏' },
+        { id: 'turtle', name: '萬壽金龜', price: 850, preview: '🐢', desc: '穩紮穩打一步一腳印，象徵堅持不懈的勤學毅力王' }
       ]
     };
 
@@ -67,9 +82,11 @@ class ShopManager {
       equippedSkin: 'default',
       unlockedSounds: ['mechanical'],
       equippedSound: 'mechanical',
-      unlockedAvatars: ['cat'],
-      equippedAvatar: 'cat',
-      lessonStars: {}, // { 'zh-1': 3, 'en-1': 2 }
+      unlockedAvatars: ['knight'],
+      equippedAvatar: 'knight',
+      unlockedPets: ['shiba'],
+      equippedPet: 'shiba',
+      lessonStars: {},
       unlockedAchievements: []
     };
   }
@@ -97,13 +114,17 @@ class ShopManager {
         parsed.lessonStars = (parsed.lessonStars && typeof parsed.lessonStars === 'object') ? parsed.lessonStars : {};
         parsed.unlockedSkins = Array.isArray(parsed.unlockedSkins) && parsed.unlockedSkins.length ? parsed.unlockedSkins : ['default'];
         parsed.unlockedSounds = Array.isArray(parsed.unlockedSounds) && parsed.unlockedSounds.length ? parsed.unlockedSounds : ['mechanical'];
-        parsed.unlockedAvatars = Array.isArray(parsed.unlockedAvatars) && parsed.unlockedAvatars.length ? parsed.unlockedAvatars : ['cat'];
+        parsed.unlockedAvatars = Array.isArray(parsed.unlockedAvatars) && parsed.unlockedAvatars.length ? parsed.unlockedAvatars : ['knight'];
+        if (!parsed.unlockedAvatars.includes('knight')) parsed.unlockedAvatars.push('knight');
+        parsed.unlockedPets = Array.isArray(parsed.unlockedPets) && parsed.unlockedPets.length ? parsed.unlockedPets : ['shiba'];
+        if (!parsed.unlockedPets.includes('shiba')) parsed.unlockedPets.push('shiba');
         parsed.coins = Number(parsed.coins) >= 0 ? Number(parsed.coins) : 0;
         parsed.exp = Number(parsed.exp) >= 0 ? Number(parsed.exp) : 0;
         parsed.level = Number(parsed.level) >= 1 ? Number(parsed.level) : 1;
         parsed.equippedSkin = parsed.equippedSkin || 'default';
         parsed.equippedSound = parsed.equippedSound || 'mechanical';
-        parsed.equippedAvatar = parsed.equippedAvatar || 'cat';
+        parsed.equippedAvatar = (parsed.equippedAvatar && this.catalog.avatars.some(a => a.id === parsed.equippedAvatar)) ? parsed.equippedAvatar : 'knight';
+        parsed.equippedPet = (parsed.equippedPet && this.catalog.pets.some(p => p.id === parsed.equippedPet)) ? parsed.equippedPet : 'shiba';
         return parsed;
       } catch (e) {
         console.error('讀取存檔失敗，使用初始設定:', e);
@@ -282,7 +303,8 @@ class ShopManager {
 
     const unlockedList = category === 'skins' ? this.data.unlockedSkins
       : category === 'sounds' ? this.data.unlockedSounds
-      : this.data.unlockedAvatars;
+      : category === 'avatars' ? this.data.unlockedAvatars
+      : (this.data.unlockedPets = this.data.unlockedPets || ['shiba']);
 
     if (unlockedList.includes(itemId)) {
       // 已經擁有，直接裝備
@@ -312,6 +334,8 @@ class ShopManager {
       if (window.soundEngine) window.soundEngine.setSoundPack(itemId);
     } else if (category === 'avatars') {
       this.data.equippedAvatar = itemId;
+    } else if (category === 'pets') {
+      this.data.equippedPet = itemId;
     }
     this.saveData();
   }
@@ -338,12 +362,17 @@ class ShopManager {
     if (titleEl) titleEl.innerText = this.getTitleByLevel(this.data.level);
     if (avatarEl) {
       const activeAvatar = this.catalog.avatars.find(a => a.id === this.data.equippedAvatar);
-      avatarEl.innerText = activeAvatar ? activeAvatar.preview : '🐱';
+      avatarEl.innerText = activeAvatar ? activeAvatar.preview : '🛡️';
     }
     const modalAvatar = document.getElementById('profile-modal-avatar');
     if (modalAvatar) {
       const activeAvatar = this.catalog.avatars.find(a => a.id === this.data.equippedAvatar);
-      modalAvatar.innerText = activeAvatar ? activeAvatar.preview : '🐱';
+      modalAvatar.innerText = activeAvatar ? activeAvatar.preview : '🛡️';
+    }
+    const mascotAvatar = document.getElementById('mascot-avatar');
+    if (mascotAvatar) {
+      const activePet = (this.catalog.pets || []).find(p => p.id === this.data.equippedPet);
+      mascotAvatar.innerText = activePet ? activePet.preview : '🐶';
     }
   }
 }

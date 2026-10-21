@@ -469,35 +469,42 @@ class CloudSyncManager {
       classLeaderboardSelect.value = '';
     }
 
-    // 填入「課堂自訂特訓」前臺與後臺目標班級下拉選單 (含全校共用選項)
-    const customSelects = [
-      document.getElementById('custom-lesson-class-select'),
-      document.getElementById('admin-custom-target-class')
-    ].filter(Boolean);
-
-    customSelects.forEach(sel => {
-      const currentVal = sel.value || (sel.id === 'custom-lesson-class-select' ? targetClass : 'all');
-      sel.innerHTML = '';
-
-      // 全校共用選項
-      const allOpt = document.createElement('option');
-      allOpt.value = 'all';
-      allOpt.innerText = sel.id === 'admin-custom-target-class' ? '🌐 全校所有班級 (共用特訓)' : '🌐 全校共用特訓';
-      sel.appendChild(allOpt);
+    // 填入「自訂特訓」前臺與後臺班級下拉選單 (取消全校共同特訓，純分班特訓)
+    const frontCustomSel = document.getElementById('custom-lesson-class-select');
+    if (frontCustomSel) {
+      frontCustomSel.innerHTML = '';
+      const promptOpt = document.createElement('option');
+      promptOpt.value = '';
+      promptOpt.innerText = '選擇班級';
+      promptOpt.disabled = true;
+      promptOpt.selected = true;
+      frontCustomSel.appendChild(promptOpt);
 
       sortedList.forEach(cls => {
         const opt = document.createElement('option');
         opt.value = cls;
         opt.innerText = cls;
-        sel.appendChild(opt);
+        frontCustomSel.appendChild(opt);
       });
+      frontCustomSel.value = '';
+    }
 
-      if (currentVal && (currentVal === 'all' || sortedList.includes(currentVal))) {
-        sel.value = currentVal;
-      } else {
-        sel.value = sel.id === 'custom-lesson-class-select' ? targetClass : 'all';
+    const adminCustomSel = document.getElementById('admin-custom-target-class');
+    if (adminCustomSel) {
+      const curVal = adminCustomSel.value || sortedList[0] || '';
+      adminCustomSel.innerHTML = '';
+      sortedList.forEach(cls => {
+        const opt = document.createElement('option');
+        opt.value = cls;
+        opt.innerText = `🏫 ${cls}`;
+        adminCustomSel.appendChild(opt);
+      });
+      if (curVal && sortedList.includes(curVal)) {
+        adminCustomSel.value = curVal;
+      } else if (sortedList.length > 0) {
+        adminCustomSel.value = sortedList[0];
       }
-    });
+    }
   }
 
   // ==========================================
@@ -825,10 +832,12 @@ class CloudSyncManager {
         coins: Number(playerData.coins) >= 0 ? Number(playerData.coins) : 0,
         equippedSkin: playerData.equippedSkin || 'default',
         equippedSound: playerData.equippedSound || 'mechanical',
-        equippedAvatar: playerData.equippedAvatar || 'cat',
+        equippedAvatar: playerData.equippedAvatar || 'knight',
+        equippedPet: playerData.equippedPet || 'shiba',
         unlockedSkins: playerData.unlockedSkins || ['default'],
         unlockedSounds: playerData.unlockedSounds || ['mechanical'],
-        unlockedAvatars: playerData.unlockedAvatars || ['cat'],
+        unlockedAvatars: playerData.unlockedAvatars || ['knight'],
+        unlockedPets: playerData.unlockedPets || ['shiba'],
         lessonStars: playerData.lessonStars || {},
         unlockedAchievements: playerData.unlockedAchievements || [],
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()

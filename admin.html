@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 教學管理與教師後臺系統 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="TypeHero 鍵盤英雄 教師專屬管理後臺：提供 Google 帳號身分驗證、分班課堂自訂生字詞發布、學生密碼查閱與重設、全校班級設定與雲端連線診斷。">
-  <link rel="stylesheet" href="css/styles.css?v=2.7.0">
+  <link rel="stylesheet" href="css/styles.css?v=2.8.0">
   
   <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -349,7 +349,7 @@
           </div>
 
           <p style="font-size:0.76rem; color:var(--text-muted); margin-bottom:1rem; line-height:1.4;">
-            老師可在此發布「全校共用」或「指定班級專屬」的當週國語生字詞與短句！發布後，學生端選擇所屬班級即可立即展開練習！
+            老師可在此發布「指定班級專屬」的當週國語生字詞與短句！發布後，學生端選擇所屬班級即可立即展開練習！
           </p>
 
           <div style="display:flex; flex-direction:column; gap:0.85rem;">
@@ -359,7 +359,7 @@
                 🎯 選擇欲發布的班級特訓 (下拉選單)
               </label>
               <select id="admin-custom-target-class" class="form-select" style="font-size:0.88rem; font-weight:700;">
-                <option value="all">🌐 全校所有班級 (共用特訓)</option>
+                
                 <!-- 由 JS 動態注入所有班級 -->
               </select>
             </div>
@@ -943,7 +943,7 @@
   </footer>
 
   <!-- 模組腳本載入 (版本號防快取) -->
-  <script src="js/firebase-config.js?v=2.9.0"></script>
+  <script src="js/firebase-config.js?v=3.0.0"></script>
   <script src="js/admin.js?v=2.9.0"></script>
 </body>
 </html>

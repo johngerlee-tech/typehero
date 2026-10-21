@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
-  <link rel="stylesheet" href="css/styles.css?v=2.7.0">
+  <link rel="stylesheet" href="css/styles.css?v=2.8.0">
   
   <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -21,16 +21,14 @@
         <div class="brand-logo">⌨️</div>
         <div class="brand-text">
           <h1>TypeHero 鍵盤英雄</h1>
-          <p class="brand-subtitle">
-            <span>溪</span><span>洲</span><span>國</span><span>小</span><span>打</span><span>字</span><span>冒</span><span>險</span><span>學</span><span>院</span>
-          </p>
+          <p class="brand-subtitle">溪洲國小打字冒險學院</p>
         </div>
       </div>
 
       <!-- 學生狀態欄 (等級、稱號、班級座號獨立行防擠壓、虛擬星幣) -->
       <div class="user-stats-bar">
         <div class="stat-pill pill-level" id="user-profile-badge" title="點擊修改暱稱與通關密碼" style="cursor: pointer;">
-          <span id="user-avatar-display">🐱</span>
+          <span id="user-avatar-display">🛡️</span>
           <div class="user-profile-info-col">
             <div class="user-profile-line-1">
               <span id="user-level-display">Lv.1</span>
@@ -108,31 +106,31 @@
     <div class="course-tabs-wrapper">
       <div class="course-tabs">
         <button class="course-tab-btn active" data-category="zhuyin">
-          <span style="font-weight:900;">ㄅ</span> 注音符號與聲調盲打 (15關)
+          <span style="font-weight:900;">ㄅ</span> 注音符號與聲調盲打
         </button>
         <button class="course-tab-btn" data-category="chinese">
-          <span>📖</span> 中文生字詞與全形標點 (15關)
+          <span>📖</span> 中文生字詞與全形標點
         </button>
         <button class="course-tab-btn" data-category="english">
-          <span>🔤</span> 國小英語標準盲打 (15關)
+          <span>🔤</span> 國小英語標準盲打
         </button>
-        <!-- 教師課堂自訂特訓分頁 (需求 5 & 9: 附帶班級特訓選單與班級排行選單) -->
+        <!-- 自訂特訓分頁 (需求 1, 2, 3: 不斷行、純分班特訓、預設選擇班級、無星星圖案) -->
         <div class="custom-tab-container" id="custom-tab-container" style="display:inline-flex; align-items:center; gap:6px;">
-          <button class="course-tab-btn" id="tab-custom-lesson" data-category="custom">
-            <span>⭐</span> 課堂自訂特訓
+          <button class="course-tab-btn" id="tab-custom-lesson" data-category="custom" style="padding:0.45rem 0.85rem;">
+            自訂特訓
           </button>
-          <select id="custom-lesson-class-select" class="custom-class-dropdown" title="選擇班級自訂特訓題目">
-            <option value="all">🌐 全校共用</option>
+          <select id="custom-lesson-class-select" class="custom-class-dropdown" title="選擇欲練習的班級特訓題目">
+            <option value="" disabled selected>選擇班級</option>
           </select>
-          <!-- 需求 9: 課堂自訂特訓及下拉選單右側，增加班級排行的下拉選單 -->
+          <!-- 班級即時打字排行榜下拉選單 -->
           <select id="class-leaderboard-select" class="custom-class-dropdown" title="選擇班級查看即時班級打字排行榜" style="border-color: rgba(245, 158, 11, 0.55); color: #fbbf24; background: rgba(15, 23, 42, 0.85); font-weight: 700;">
             <option value="">🏆 班級排行...</option>
           </select>
         </div>
       </div>
 
-      <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;">
-        <span>💡 秘訣：打中文時請切換為「注音輸入法」選字；注音與英文盲打直接敲擊實體鍵！準確率需達 70% 即可通關！</span>
+      <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem; white-space: nowrap;">
+        <span>💡 秘訣：打中文時可切換「注音輸入法」做選字練習；注音與英文盲打直接敲擊實體鍵！準確率需達 70% 即可通關！</span>
       </div>
     </div>
 
@@ -204,7 +202,7 @@
 
         <!-- 鍵盤守護小精靈伴學 (Proposal IV.1) -->
         <div class="mascot-companion-card" id="mascot-companion-card">
-          <div class="mascot-avatar" id="mascot-avatar">🐱</div>
+          <div class="mascot-avatar" id="mascot-avatar">🐶</div>
           <div class="mascot-speech-bubble" id="mascot-speech-bubble">
             準備好開始了嗎？手指出動！✨
           </div>
@@ -428,7 +426,8 @@
         <div class="shop-tabs">
           <button class="shop-tab-btn active" data-tab="skins">🎨 鍵盤外觀</button>
           <button class="shop-tab-btn" data-tab="sounds">🎵 擊鍵音效</button>
-          <button class="shop-tab-btn" data-tab="avatars">🐱 角色頭像</button>
+          <button class="shop-tab-btn" data-tab="avatars">🛡️ 冒險英雄</button>
+          <button class="shop-tab-btn" data-tab="pets">🐾 陪伴寵物</button>
         </div>
 
         <div class="shop-items-container" id="shop-items-container">
@@ -524,7 +523,7 @@
         </div>
 
         <div class="profile-avatar-showcase">
-          <div class="profile-avatar-sticker" id="profile-modal-avatar">🐱</div>
+          <div class="profile-avatar-sticker" id="profile-modal-avatar">🛡️</div>
           <div class="profile-avatar-tag">目前冒險英雄頭像</div>
         </div>
 
@@ -890,8 +889,8 @@
   <!-- 核心模組腳本載入 (加入版本控制防止快取) -->
   <script src="js/audio.js?v=2.5.2"></script>
   <script src="js/lessons.js?v=2.5.2"></script>
-  <script src="js/shop.js?v=2.9.0"></script>
-  <script src="js/firebase-config.js?v=2.9.0"></script>
-  <script src="js/app.js?v=2.9.0"></script>
+  <script src="js/shop.js?v=3.0.0"></script>
+  <script src="js/firebase-config.js?v=3.0.0"></script>
+  <script src="js/app.js?v=3.0.0"></script>
 </body>
 </html>

@@ -145,7 +145,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 語音朗讀發音按鈕綁定 (Proposal III.1.1)
   const speakBtn = document.getElementById('btn-speak-text');
-  if (speakBtn) speakBtn.onclick = speakPromptText;
+  if (speakBtn) {
+    speakBtn.onclick = (e) => {
+      if (e) e.stopPropagation();
+      speakPromptText();
+      focusTyping();
+    };
+  }
 
   // 頂部導航成就榮譽牆按鈕綁定 (Proposal IV.3 & Req 6)
   const achModal = document.getElementById('modal-achievements');
@@ -221,10 +227,40 @@ document.addEventListener('DOMContentLoaded', () => {
   if (arena) arena.onclick = focusTyping;
   if (alertOverlay) alertOverlay.onclick = focusTyping;
 
+  // 點擊陪伴寵物互動 (需求 7 & 8)
+  const mascotAvatarEl = document.getElementById('mascot-avatar');
+  if (mascotAvatarEl) {
+    mascotAvatarEl.onclick = (e) => {
+      if (e) e.stopPropagation();
+      const pet = (window.shopManager && window.shopManager.catalog && window.shopManager.catalog.pets) 
+        ? window.shopManager.catalog.pets.find(p => p.id === window.shopManager.data.equippedPet) 
+        : null;
+      const petName = pet ? pet.name : '陪伴寵物';
+      const bubble = document.getElementById('mascot-speech-bubble');
+      if (bubble) {
+        const lines = [
+          '🐾 ' + petName + '：我會一直陪著你練習打字，加油！',
+          '✨ ' + petName + '：手指要放輕鬆，眼睛看著螢幕唷！',
+          '💖 ' + petName + '：今天也要一起成為打字英雄！',
+          '⭐ ' + petName + '：去商城的「陪伴寵物」可以換更多小夥伴喔！'
+        ];
+        bubble.innerText = lines[Math.floor(Math.random() * lines.length)];
+      }
+      mascotAvatarEl.style.transform = 'scale(1.25) rotate(-10deg)';
+      setTimeout(() => { if (mascotAvatarEl) mascotAvatarEl.style.transform = ''; }, 500);
+      focusTyping();
+    };
+  }
+
   // 重來按鈕
-  document.getElementById('btn-restart-lesson').onclick = () => {
-    if (gameState.currentLesson) selectLesson(gameState.currentLesson.id);
-  };
+  const restartBtn = document.getElementById('btn-restart-lesson');
+  if (restartBtn) {
+    restartBtn.onclick = (e) => {
+      if (e) e.stopPropagation();
+      if (gameState.currentLesson) selectLesson(gameState.currentLesson.id);
+      focusTyping();
+    };
+  }
 
   // 音效開關切換
   document.getElementById('toggle-sound').onclick = () => {
@@ -1438,45 +1474,48 @@ function speakPromptText() {
 // Proposal IV.2: 鍵盤守護精靈伴學小卡 (動態問候與情緒回饋)
 function updateMascot(type, param) {
   const bubble = document.getElementById('mascot-speech-bubble');
-  const icon = document.getElementById('mascot-character-icon');
+  const avatar = document.getElementById('mascot-avatar');
   if (!bubble) return;
 
   switch (type) {
     case 'start':
       bubble.innerText = '加油！看著螢幕手指，不要低頭看鍵盤，慢慢打最快喔！';
-      if (icon) icon.innerText = '🐱';
       break;
     case 'combo':
       if (param >= 20) {
-        bubble.innerText = '🔥 太狂啦！連續擊中 20 次！進入狂熱 FEVER 模式！';
-        if (icon) icon.innerText = '🦁';
+        bubble.innerText = `🔥 太狂啦！連續擊中 ${param} 次！進入狂熱 FEVER 模式！`;
+        if (avatar) {
+          avatar.style.transform = 'scale(1.22) translateY(-14px)';
+          setTimeout(() => { if (avatar) avatar.style.transform = ''; }, 600);
+        }
       } else if (param >= 10) {
-        bubble.innerText = '⚡ 節奏超棒！連續命中 10 次！手腕要放鬆喔！';
-        if (icon) icon.innerText = '🦊';
+        bubble.innerText = `⚡ 節奏超棒！連續命中 ${param} 次！手腕要放鬆喔！`;
+        if (avatar) {
+          avatar.style.transform = 'scale(1.15) translateY(-8px)';
+          setTimeout(() => { if (avatar) avatar.style.transform = ''; }, 500);
+        }
       } else if (param >= 5) {
         bubble.innerText = '✨ 很好！五連擊！保持端正坐姿！';
-        if (icon) icon.innerText = '🐱';
       }
       break;
     case 'wrong':
       bubble.innerText = '沒關係！不要慌張，看清楚指引手指再按下！';
-      if (icon) icon.innerText = '🐶';
       break;
     case 'stuck':
       bubble.innerText = '卡住了嗎？看鍵盤上的金黃色呼吸光暈，就是那個鍵！';
-      if (icon) icon.innerText = '💡';
       break;
     case 'pass':
       bubble.innerText = '🎉 太棒了！順利通過考驗，你又往前邁進一步了！';
-      if (icon) icon.innerText = '🏆';
+      if (avatar) {
+        avatar.style.transform = 'scale(1.28) rotate(12deg)';
+        setTimeout(() => { if (avatar) avatar.style.transform = ''; }, 800);
+      }
       break;
     case 'fail':
       bubble.innerText = '別灰心！雙手放回基準鍵，我們再來挑戰一次！';
-      if (icon) icon.innerText = '🌱';
       break;
     default:
       bubble.innerText = '雙手食指放在 F 與 J 上，準備開始練習囉！';
-      if (icon) icon.innerText = '🐱';
   }
 }
 
@@ -1966,7 +2005,7 @@ function initModals() {
       const modalAvatar = document.getElementById('profile-modal-avatar');
       if (modalAvatar && window.shopManager) {
         const activeAvatar = window.shopManager.catalog.avatars.find(a => a.id === window.shopManager.data.equippedAvatar);
-        modalAvatar.innerText = activeAvatar ? activeAvatar.preview : '🐱';
+        modalAvatar.innerText = activeAvatar ? activeAvatar.preview : '🛡️';
       }
 
       if (profileModal) profileModal.classList.add('active');
@@ -2445,7 +2484,7 @@ async function loadCustomLessonForClass(targetClass) {
   const customContainer = document.getElementById('custom-tab-container') || document.getElementById('tab-custom-lesson');
   const classDropdown = document.getElementById('custom-lesson-class-select');
   const studentClass = (window.cloudSync && window.cloudSync.profile) ? window.cloudSync.profile.className : 'all';
-  const queryClass = targetClass || (classDropdown ? classDropdown.value : studentClass) || 'all';
+  const queryClass = targetClass || (classDropdown ? classDropdown.value : '') || studentClass;
 
   let lessonData = null;
   if (window.cloudSync && window.cloudSync.fetchCustomLessonFromCloud) {
@@ -2874,11 +2913,13 @@ function renderShopItems(tabCategory) {
 
   const unlockedList = tabCategory === 'skins' ? pData.unlockedSkins
     : tabCategory === 'sounds' ? pData.unlockedSounds
-    : pData.unlockedAvatars;
+    : tabCategory === 'avatars' ? pData.unlockedAvatars
+    : (pData.unlockedPets = pData.unlockedPets || ['shiba']);
 
   const equippedItem = tabCategory === 'skins' ? pData.equippedSkin
     : tabCategory === 'sounds' ? pData.equippedSound
-    : pData.equippedAvatar;
+    : tabCategory === 'avatars' ? pData.equippedAvatar
+    : (pData.equippedPet || 'shiba');
 
   items.forEach(item => {
     const card = document.createElement('div');
