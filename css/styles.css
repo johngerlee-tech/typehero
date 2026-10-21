@@ -623,15 +623,31 @@ main {
 /* 課程導航分類籤 (Tabs: 注音盲打 / 中文標點詞彙 / 國小英文) */
 .course-tabs-wrapper {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  flex-wrap: nowrap;
-  gap: 0.75rem;
+  width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
+  margin-bottom: 0.35rem;
 }
 .course-tabs-wrapper::-webkit-scrollbar {
   display: none;
+}
+
+/* 獨立換行秘訣提示列 (不與分類按鈕擠在同一行) */
+.course-tip-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  padding: 0.15rem 0.2rem;
+  margin-bottom: 0.65rem;
+}
+
+body.in-fullscreen-mode .course-tip-banner {
+  margin-bottom: 0.3rem;
+  padding: 0.05rem 0.2rem;
 }
 
 .course-tabs {

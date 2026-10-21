@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
-  <link rel="stylesheet" href="css/styles.css?v=2.9.1">
+  <link rel="stylesheet" href="css/styles.css?v=2.9.2">
   
   <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -114,7 +114,7 @@
         <button class="course-tab-btn" data-category="english">
           <span>🔤</span> 國小英語標準盲打
         </button>
-        <!-- 自訂特訓分頁 (需求 1, 2, 3: 不斷行、純分班特訓、預設選擇班級、無星星圖案) -->
+        <!-- 自訂特訓分頁 (不斷行、純分班特訓、預設選擇班級、無星星圖案) -->
         <div class="custom-tab-container" id="custom-tab-container" style="display:inline-flex; align-items:center; gap:6px;">
           <button class="course-tab-btn" id="tab-custom-lesson" data-category="custom" style="padding:0.45rem 0.85rem;">
             自訂特訓
@@ -128,10 +128,11 @@
           </select>
         </div>
       </div>
+    </div>
 
-      <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem; white-space: nowrap;">
-        <span>💡 秘訣：打中文時可切換「注音輸入法」做選字練習；注音與英文盲打直接敲擊實體鍵！準確率需達 70% 即可通關！</span>
-      </div>
+    <!-- 獨立換行秘訣提示列 (不與第一排分類排在同一行，避免擠壓版面) -->
+    <div class="course-tip-banner" id="course-tip-banner">
+      <span>💡 秘訣：打中文時可切換「注音輸入法」做選字練習；注音與英文盲打直接敲擊實體鍵！準確率需達 70% 即可通關！</span>
     </div>
 
     <!-- 核心兩欄並列工作台 (左側 240px 側邊儀表板 + 右側 打字舞台與虛擬鍵盤，單屏無滾動！) -->
