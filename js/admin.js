@@ -4,6 +4,19 @@
  * 課堂指定班級特訓題目發布、學生密碼查閱與修改、全校班級設定。
  */
 
+/**
+ * 安全過濾 HTML 特殊字元防止 XSS 與 undefined 錯誤
+ */
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   let adminRole = null; // 'teacher' | 'master_admin' | null
   let currentAuthUser = null;
@@ -502,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (customTextInp) customTextInp.value = '';
         if (customCharCount) customCharCount.innerText = '字數統計：0 字';
         alert(`✅ 已清空【${classNameDisplay}】之自訂特訓！`);
-        loadPublishedLessonsList();
+        await loadPublishedLessonsList();
       }
     };
   }
@@ -547,9 +560,14 @@ document.addEventListener('DOMContentLoaded', () => {
           </span>
           <span style="color:var(--text-muted); font-size:0.7rem;">(${item.text ? item.text.length : 0} 字)</span>
         </div>
-        <button class="btn-secondary btn-load-item" style="font-size:0.72rem; padding:0.2rem 0.55rem;">
-          載入編輯
-        </button>
+        <div style="display:flex; align-items:center; gap:0.4rem;">
+          <button class="btn-secondary btn-load-item" style="font-size:0.72rem; padding:0.2rem 0.55rem;">
+            載入編輯
+          </button>
+          <button class="btn-secondary btn-delete-item" style="font-size:0.72rem; padding:0.2rem 0.55rem; color:#f87171; border-color:rgba(239,68,68,0.4);" title="徹底刪除此特訓題目">
+            🗑️ 刪除
+          </button>
+        </div>
       `;
 
       row.querySelector('.btn-load-item').onclick = () => {
@@ -559,6 +577,22 @@ document.addEventListener('DOMContentLoaded', () => {
           customTextInp.value = item.text || '';
           if (customCharCount) customCharCount.innerText = `字數統計：${item.text.length} 字`;
         }
+      };
+
+      row.querySelector('.btn-delete-item').onclick = async () => {
+        const isAll = item.targetClass === 'all';
+        const label = isAll ? '全校共用' : item.targetClass;
+        if (!confirm(`確定要徹底刪除【${label}】的課堂特訓題目嗎？\n\n特訓主題：${item.title || '特訓題目'}`)) return;
+        if (window.cloudSync) {
+          await window.cloudSync.deleteCustomLessonFromCloud(item.targetClass);
+        }
+        if (targetClassSelect && targetClassSelect.value === item.targetClass) {
+          if (customTitleInp) customTitleInp.value = '';
+          if (customTextInp) customTextInp.value = '';
+          if (customCharCount) customCharCount.innerText = '字數統計：0 字';
+        }
+        alert(`✅ 已成功刪除【${label}】特訓題目！`);
+        await loadPublishedLessonsList();
       };
 
       publishedLessonsList.appendChild(row);
@@ -849,7 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // 2. 點擊「解除綁定」 (需求 2: 解除別人亂使用該座號的綁定)
       tr.querySelector('.btn-unbind-student').onclick = async () => {
         const studentDesc = `${selectedClass} ${st.seatNumber}號 ${st.realName ? st.realName + ' ' : ''}`;
-        const confirmMsg = `確定要為【${studentDesc}】解除身分綁定嗎？\n\n🎯 上課教師即時處置情境：\n當學生座號遭其他非本班同學或他人亂登入占用時，授課教師可立即執行此解除綁定！\n\n執行後將會：\n1. 立即清空該座號被亂設定的通行密碼與自訂暱稱（原座號同學當場可重新自由登入並設定密碼）\n2. 100% 完整保留原本校內名冊記載之「真實姓名」與「學號」學籍\n3. 重設該座號的冒用累積紀錄\n\n確定立即解除冒用綁定？`;
+        const confirmMsg = `確定要為【${studentDesc}】解除身分綁定嗎？\n\n🎯 上課教師即時處置情境：\n當學生座號遭其他非本班同學或他人亂登入占用時，授課教師可立即執行此解除綁定！\n\n執行後將會：\n1. 立即清空該座號被亂設定的通行密碼、自訂暱稱與累積星幣（星幣歸 0，原座號同學當場可重新自由登入並設定密碼）\n2. 100% 完整保留原本校內名冊記載之「真實姓名」與「學號」學籍\n3. 重設該座號的冒用累積紀錄\n\n確定立即解除冒用綁定？`;
         if (!confirm(confirmMsg)) return;
 
         if (window.cloudSync && window.cloudSync.adminUnbindStudent) {

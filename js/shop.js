@@ -60,7 +60,7 @@ class ShopManager {
    */
   getDefaultPlayerData() {
     return {
-      coins: 100, // 新手開學見面禮 100 幣
+      coins: 0, // 初始星幣為 0
       exp: 0,
       level: 1,
       unlockedSkins: ['default'],
@@ -98,7 +98,7 @@ class ShopManager {
         parsed.unlockedSkins = Array.isArray(parsed.unlockedSkins) && parsed.unlockedSkins.length ? parsed.unlockedSkins : ['default'];
         parsed.unlockedSounds = Array.isArray(parsed.unlockedSounds) && parsed.unlockedSounds.length ? parsed.unlockedSounds : ['mechanical'];
         parsed.unlockedAvatars = Array.isArray(parsed.unlockedAvatars) && parsed.unlockedAvatars.length ? parsed.unlockedAvatars : ['cat'];
-        parsed.coins = Number(parsed.coins) >= 0 ? Number(parsed.coins) : 100;
+        parsed.coins = Number(parsed.coins) >= 0 ? Number(parsed.coins) : 0;
         parsed.exp = Number(parsed.exp) >= 0 ? Number(parsed.exp) : 0;
         parsed.level = Number(parsed.level) >= 1 ? Number(parsed.level) : 1;
         parsed.equippedSkin = parsed.equippedSkin || 'default';
@@ -127,7 +127,7 @@ class ShopManager {
       window.soundEngine.setSoundPack(this.data.equippedSound);
     }
     this.updateUI();
-    console.log(`✨ 已為學生 [${studentId || '新帳號'}] 初始化乾淨的新帳號資料（等級1、100金幣、零進度）`);
+    console.log(`✨ 已為學生 [${studentId || '新帳號'}] 初始化乾淨的新帳號資料（等級1、0星幣、零進度）`);
   }
 
   /**
@@ -175,7 +175,7 @@ class ShopManager {
 
     // 1. 金幣與經驗值（完全依據雲端存檔還原）
     const cloudCoins = Number(cloudData.coins);
-    const coins = (!isNaN(cloudCoins) && cloudCoins >= 0) ? cloudCoins : 100;
+    const coins = (!isNaN(cloudCoins) && cloudCoins >= 0) ? cloudCoins : 0;
 
     const cloudExp = Number(cloudData.exp);
     const exp = (!isNaN(cloudExp) && cloudExp >= 0) ? cloudExp : 0;

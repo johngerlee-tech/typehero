@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
-  <link rel="stylesheet" href="css/styles.css?v=2.6.0">
+  <link rel="stylesheet" href="css/styles.css?v=2.7.0">
   
   <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -50,9 +50,9 @@
         </div>
 
         <!-- 需求 2: 雲端連線指示 (保持單純 ☁️，white-space: nowrap 防止斷行) -->
-        <div class="stat-pill pill-cloud" id="cloud-status-pill" title="Firebase 雲端連線狀態" style="cursor: pointer;">
-          <span id="cloud-status-icon">☁️</span>
-          <span id="cloud-status-text">連線中...</span>
+        <div class="stat-pill pill-cloud" id="cloud-status-pill" title="Firebase 雲端連線狀態" style="cursor: default; padding: 0.45rem 0.65rem;">
+          <span id="cloud-status-icon" style="font-size: 1.15rem; line-height: 1;">☁️</span>
+          <span id="cloud-status-text" style="display: none;"></span>
         </div>
       </div>
 
@@ -89,13 +89,13 @@
         </button>
 
         <!-- 登出按鈕 (換人練功) -->
-        <button id="nav-btn-logout" class="btn-icon btn-logout" title="登出目前學生帳號 (換人練功)">
-          <span>🚪</span>
+        <button id="nav-btn-logout" class="btn-logout" title="登出目前學生帳號 (換人練功)" style="height: 44px; padding: 0.45rem 0.9rem; font-size: 0.85rem; font-weight: 800; border-radius: var(--radius-sm); border: 1px solid rgba(248, 113, 113, 0.45); background: rgba(239, 68, 68, 0.12); color: #f87171; cursor: pointer; display: flex; align-items: center; justify-content: center; text-decoration: none; user-select: none;">
+          登出
         </button>
 
         <!-- 選擇關卡快速錨點 -->
-        <a href="#lessons-panel" class="btn-primary" style="text-decoration: none;">
-          <span>關卡<BR>地圖</span>
+        <a href="#lessons-panel" class="btn-primary" style="text-decoration: none; padding: 0.35rem 0.75rem; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;">
+          <span style="display: block; line-height: 1.2; text-align: center; font-size: 0.8rem; font-weight: 800;">關卡<br>地圖</span>
         </a>
       </div>
     </div>
@@ -108,7 +108,7 @@
     <div class="course-tabs-wrapper">
       <div class="course-tabs">
         <button class="course-tab-btn active" data-category="zhuyin">
-          <span>🇹🇼</span> 注音符號與聲調盲打 (15關)
+          <span style="font-weight:900;">ㄅ</span> 注音符號與聲調盲打 (15關)
         </button>
         <button class="course-tab-btn" data-category="chinese">
           <span>📖</span> 中文生字詞與全形標點 (15關)
@@ -116,13 +116,17 @@
         <button class="course-tab-btn" data-category="english">
           <span>🔤</span> 國小英語標準盲打 (15關)
         </button>
-        <!-- 教師課堂自訂特訓分頁 (需求 5: 附帶班級下拉選單) -->
-        <div class="custom-tab-container" id="custom-tab-container" style="display:none; align-items:center; gap:6px;">
+        <!-- 教師課堂自訂特訓分頁 (需求 5 & 9: 附帶班級特訓選單與班級排行選單) -->
+        <div class="custom-tab-container" id="custom-tab-container" style="display:inline-flex; align-items:center; gap:6px;">
           <button class="course-tab-btn" id="tab-custom-lesson" data-category="custom">
             <span>⭐</span> 課堂自訂特訓
           </button>
           <select id="custom-lesson-class-select" class="custom-class-dropdown" title="選擇班級自訂特訓題目">
             <option value="all">🌐 全校共用</option>
+          </select>
+          <!-- 需求 9: 課堂自訂特訓及下拉選單右側，增加班級排行的下拉選單 -->
+          <select id="class-leaderboard-select" class="custom-class-dropdown" title="選擇班級查看即時班級打字排行榜" style="border-color: rgba(245, 158, 11, 0.55); color: #fbbf24; background: rgba(15, 23, 42, 0.85); font-weight: 700;">
+            <option value="">🏆 班級排行...</option>
           </select>
         </div>
       </div>
@@ -218,7 +222,7 @@
           <div class="stage-top-meta">
             <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
               <div class="lesson-badge" id="stage-mode-badge">
-                <span>🇹🇼 台灣大千注音盲打特訓</span>
+                <span>ㄅ 台灣大千注音盲打特訓</span>
               </div>
               <!-- 中文生字詞即時拼音注音聲調拆解 (Proposal III.1.2) -->
               <div id="zhuyin-decompose-badge" class="zhuyin-decompose-badge hidden">
@@ -479,6 +483,36 @@
     </div>
   </div>
 
+  
+  <!-- 3.1 指定班級即時打字排行榜彈窗 (需求 9: 可關閉) -->
+  <div class="modal-backdrop" id="modal-class-leaderboard">
+    <div class="modal-sheet" style="max-width: 650px;">
+      <div class="modal-rainbow-bar"></div>
+      <div class="modal-content" style="align-items: stretch; text-align: left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+          <h3 style="font-size: 1.25rem; font-weight: 800; display:flex; align-items:center; gap:0.5rem;">
+            <span>🏆</span>
+            <span id="class-leaderboard-modal-title">班級即時打字排行榜</span>
+          </h3>
+          <button class="btn-icon" id="close-class-leader-btn" style="width: 36px; height: 36px; font-size: 1.1rem;" title="關閉視窗">✕</button>
+        </div>
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.85rem;">
+          統計本班所有登錄英雄之最佳打字速度 (WPM)、準確率與冒險星幣：
+        </p>
+
+        <div class="leaderboard-list" id="class-leaderboard-list" style="max-height: 420px; overflow-y: auto;">
+          <!-- 由 JavaScript 動態填入班級學生排行資料 -->
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+          <button id="close-class-leader-btn-footer" class="btn-secondary" style="padding: 0.45rem 1.25rem; font-size: 0.85rem; font-weight: bold;">
+            關閉視窗
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 4. 學生修改暱稱與密碼彈窗 (Profile Modal - 需求 3) -->
   <div class="modal-backdrop" id="modal-profile">
     <div class="modal-sheet" style="max-width: 480px;">
@@ -502,7 +536,7 @@
               <span id="profile-modal-class-seat" style="font-weight:800; color:var(--brand-primary); font-size:0.95rem;">5年3班 18號</span>
             </div>
             <p style="font-size:0.7rem; color:var(--text-muted); margin:0.35rem 0 0 0;">
-              💡 班級與座號不可在此任意切換；如需更換為其他學生身分，請點擊頁尾「🎒 切換學生身分」。
+              💡 班級與座號不可在此任意切換；如需更換為其他同學，請點擊右上角或下方「登出」按鈕。
             </p>
           </div>
 
@@ -839,13 +873,9 @@
   <footer>
     <div class="footer-inner">
       <div class="footer-copyright">
-        © 2026 TypeHero 鍵盤英雄 · 專為溪洲國小學童設計之打字冒險學院 · 支援 100% 離線執行與班級雲端排行榜
+        © 2026 TypeHero 鍵盤英雄 · 專為溪洲國小學童設計之打字冒險學院 · 支援班級雲端排行榜
       </div>
       <div class="footer-links">
-        <a href="javascript:void(0)" onclick="openStudentLoginModal()">
-          🎒 切換學生身分
-        </a>
-        <span>·</span>
         <a href="javascript:void(0)" onclick="window.studentLogout && window.studentLogout()" style="color: #f87171; font-weight: bold;">
           🚪 登出帳號
         </a>
@@ -860,8 +890,8 @@
   <!-- 核心模組腳本載入 (加入版本控制防止快取) -->
   <script src="js/audio.js?v=2.5.2"></script>
   <script src="js/lessons.js?v=2.5.2"></script>
-  <script src="js/shop.js?v=2.8.0"></script>
-  <script src="js/firebase-config.js?v=2.8.0"></script>
-  <script src="js/app.js?v=2.8.0"></script>
+  <script src="js/shop.js?v=2.9.0"></script>
+  <script src="js/firebase-config.js?v=2.9.0"></script>
+  <script src="js/app.js?v=2.9.0"></script>
 </body>
 </html>

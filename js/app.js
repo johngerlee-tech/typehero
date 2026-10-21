@@ -1,4 +1,17 @@
 /**
+ * 安全過濾 HTML 特殊字元防止 XSS 與 undefined 錯誤
+ */
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * TypeHero 遊戲核心驅動邏輯 (App Controller)
  * 整合：
  * 1. 雙語虛擬鍵盤 (QWERTY + 大千注音) 渲染與動態高亮
@@ -182,13 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 頂部導航列雲端狀態徽章點擊
-  const cloudPill = document.getElementById('cloud-status-pill');
-  if (cloudPill) {
-    cloudPill.onclick = () => {
-      if (window.openAdminAuthModal) window.openAdminAuthModal();
-    };
-  }
+  // 頂部導航列雲端狀態徽章為指示燈（無超連結按鈕）
 
   // 載入首頁先跳出學生班級、座號與姓名登載彈窗
   const loginModal = document.getElementById('modal-student-login');
@@ -1203,7 +1210,7 @@ function loadCategory(category) {
   const imeHintText = document.getElementById('ime-guide-hint-text');
 
   if (category === 'zhuyin') {
-    badgeEl.innerText = '🇹🇼 台灣大千注音符號盲打特訓';
+    badgeEl.innerText = 'ㄅ 台灣大千注音符號盲打特訓';
     if (inputEl) {
       inputEl.setAttribute('inputmode', 'latin');
       inputEl.setAttribute('lang', 'en');
@@ -2472,9 +2479,19 @@ async function loadCustomLessonForClass(targetClass) {
     }
     return true;
   } else {
-    // 若該班無特訓且全校亦無特訓
-    if (window.COURSES && !window.COURSES.custom) {
-      if (customContainer) customContainer.style.display = 'none';
+    // 預設提供友善提示關卡，確保容器與班級排行選單始終可用
+    window.COURSES.custom = [{
+      id: 'custom-1',
+      title: queryClass === 'all' ? '全校今日特訓' : `${queryClass}今日特訓`,
+      summary: '老師尚未發布自訂特訓題目',
+      keys: [],
+      text: '任課老師可於後臺發布當週國語生字詞或課堂短句，發布後本班學生即可在此展開專屬練習！'
+    }];
+    if (customContainer) customContainer.style.display = 'inline-flex';
+    if (classDropdown && queryClass) classDropdown.value = queryClass;
+    if (gameState.currentCategory === 'custom') {
+      renderLessonsGrid(window.COURSES.custom);
+      loadLesson(window.COURSES.custom[0]);
     }
     return false;
   }
@@ -2483,11 +2500,130 @@ async function loadCustomLessonForClass(targetClass) {
 /**
  * 初始化課堂自訂題目系統與班級下拉選單綁定 (Proposal VI.1 & Req 5)
  */
+/**
+ * 開啟指定班級即時打字排行榜彈窗 (需求 9: 可關閉)
+ */
+async function openClassLeaderboardModal(className) {
+  const modal = document.getElementById('modal-class-leaderboard');
+  const titleEl = document.getElementById('class-leaderboard-modal-title');
+  const listEl = document.getElementById('class-leaderboard-list');
+  const closeBtn = document.getElementById('close-class-leader-btn');
+  const closeFooterBtn = document.getElementById('close-class-leader-btn-footer');
+  const selectEl = document.getElementById('class-leaderboard-select');
+
+  if (!modal || !listEl) return;
+
+  if (titleEl) titleEl.innerText = `【${className}】即時打字排行榜`;
+  listEl.innerHTML = `<div style="text-align:center; padding:1.5rem; color:var(--text-muted);">正在載入【${className}】即時打字排行榜...</div>`;
+  modal.classList.add('active');
+
+  const closeModal = () => {
+    modal.classList.remove('active');
+    if (selectEl) selectEl.value = '';
+  };
+
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (closeFooterBtn) closeFooterBtn.onclick = closeModal;
+  modal.onclick = (e) => {
+    if (e.target === modal) closeModal();
+  };
+
+  if (!window.cloudSync || !window.cloudSync.fetchClassRankings) {
+    listEl.innerHTML = '<div style="text-align:center; padding:1.5rem; color:#ef4444;">雲端同步模組未就緒</div>';
+    return;
+  }
+
+  const rankingList = await window.cloudSync.fetchClassRankings(className);
+  if (!rankingList || rankingList.length === 0) {
+    listEl.innerHTML = `
+      <div style="text-align:center; padding:2rem; color:var(--text-muted);">
+        <div style="font-size:2rem; margin-bottom:0.5rem;">🎒</div>
+        <div>【${className}】目前尚未有同學登錄打字成績。</div>
+        <div style="font-size:0.75rem; margin-top:0.35rem; color:var(--text-muted);">同學登入並完成任一打字關卡後，即會自動登上此班級榮譽榜！</div>
+      </div>
+    `;
+    return;
+  }
+
+  // 渲染班級排行榜表格
+  let html = `
+    <table style="width:100%; border-collapse:collapse; font-size:0.85rem; text-align:left;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-size:0.76rem;">
+          <th style="padding:0.5rem 0.4rem; width:50px; text-align:center;">名次</th>
+          <th style="padding:0.5rem 0.4rem; width:55px; text-align:center;">座號</th>
+          <th style="padding:0.5rem 0.6rem;">學生身分</th>
+          <th style="padding:0.5rem 0.6rem; text-align:center;">最佳打字速度</th>
+          <th style="padding:0.5rem 0.4rem; text-align:center;">準確率</th>
+          <th style="padding:0.5rem 0.4rem; text-align:center;">冒險資歷</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  rankingList.forEach((item, index) => {
+    let rankBadge = `${index + 1}`;
+    if (item.hasScore) {
+      if (index === 0) rankBadge = '🥇 1';
+      else if (index === 1) rankBadge = '🥈 2';
+      else if (index === 2) rankBadge = '🥉 3';
+    } else {
+      rankBadge = '-';
+    }
+
+    const wpmDisplay = item.hasScore
+      ? `<strong style="color:var(--brand-primary); font-size:1.05rem;">${item.wpm}</strong> <span style="font-size:0.72rem; color:var(--text-muted);">WPM</span>`
+      : `<span style="color:var(--text-muted); font-size:0.78rem;">尚未測驗</span>`;
+
+    const accDisplay = item.hasScore
+      ? `<span style="font-weight:bold; color:${item.accuracy >= 95 ? '#10b981' : 'var(--text-main)'};">${item.accuracy}%</span>`
+      : `<span style="color:var(--text-muted);">-</span>`;
+
+    html += `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'">
+        <td style="padding:0.55rem 0.4rem; text-align:center; font-weight:800; color:${index < 3 && item.hasScore ? '#fbbf24' : 'var(--text-muted)'}; font-size:0.9rem;">
+          ${rankBadge}
+        </td>
+        <td style="padding:0.55rem 0.4rem; text-align:center; font-family:monospace; font-weight:bold; color:var(--text-main);">
+          ${escapeHtml(item.seatNumber)}號
+        </td>
+        <td style="padding:0.55rem 0.6rem;">
+          <span style="font-weight:bold; color:var(--text-main);">${escapeHtml(item.realName || item.displayName)}</span>
+          ${item.nickname && item.realName ? `<span style="color:var(--brand-primary); font-size:0.75rem; margin-left:4px;">(${escapeHtml(item.nickname)})</span>` : ''}
+        </td>
+        <td style="padding:0.55rem 0.6rem; text-align:center;">
+          ${wpmDisplay}
+        </td>
+        <td style="padding:0.55rem 0.4rem; text-align:center;">
+          ${accDisplay}
+        </td>
+        <td style="padding:0.55rem 0.4rem; text-align:center; font-size:0.76rem; color:var(--text-muted);">
+          Lv.${item.level || 1} · 🪙 ${item.coins || 0}
+        </td>
+      </tr>
+    `;
+  });
+
+  html += '</tbody></table>';
+  listEl.innerHTML = html;
+}
+
 function initCustomLessonSystem() {
   const classDropdown = document.getElementById('custom-lesson-class-select');
   if (classDropdown) {
     classDropdown.onchange = () => {
       loadCustomLessonForClass(classDropdown.value);
+    };
+  }
+
+  // 需求 9: 課堂自訂特訓及下拉選單右側，班級排行的下拉選單綁定
+  const classLeaderboardSelect = document.getElementById('class-leaderboard-select');
+  if (classLeaderboardSelect) {
+    classLeaderboardSelect.onchange = async () => {
+      const selectedClass = classLeaderboardSelect.value;
+      if (selectedClass) {
+        await openClassLeaderboardModal(selectedClass);
+      }
     };
   }
 

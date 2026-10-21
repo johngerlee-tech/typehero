@@ -432,6 +432,24 @@ class CloudSyncManager {
       }
     });
 
+    // 填入「班級排行榜」前臺下拉選單
+    const classLeaderboardSelect = document.getElementById('class-leaderboard-select');
+    if (classLeaderboardSelect) {
+      classLeaderboardSelect.innerHTML = '';
+      const promptOpt = document.createElement('option');
+      promptOpt.value = '';
+      promptOpt.innerText = '🏆 班級排行...';
+      classLeaderboardSelect.appendChild(promptOpt);
+
+      sortedList.forEach(cls => {
+        const opt = document.createElement('option');
+        opt.value = cls;
+        opt.innerText = cls;
+        classLeaderboardSelect.appendChild(opt);
+      });
+      classLeaderboardSelect.value = '';
+    }
+
     // 填入「課堂自訂特訓」前臺與後臺目標班級下拉選單 (含全校共用選項)
     const customSelects = [
       document.getElementById('custom-lesson-class-select'),
@@ -755,7 +773,7 @@ class CloudSyncManager {
         await this.syncProfileToCloud();
 
         const displayName = this.profile.nickname || this.profile.realName || `${className} ${seatNumber}號`;
-        this.showToast(`🎉 歡迎【${displayName}】加入打字冒險學院！已為您開通全新專屬帳號（贈送新手啟動禮 100 星幣）！`, 'success');
+        this.showToast(`🎉 歡迎【${displayName}】加入打字冒險學院！已為您開通全新專屬帳號！`, 'success');
         return { success: true, isNew: true };
       }
     } catch (e) {
@@ -785,7 +803,7 @@ class CloudSyncManager {
         password: this.profile.password || '',
         level: Number(playerData.level) || 1,
         exp: Number(playerData.exp) || 0,
-        coins: Number(playerData.coins) >= 0 ? Number(playerData.coins) : 100,
+        coins: Number(playerData.coins) >= 0 ? Number(playerData.coins) : 0,
         equippedSkin: playerData.equippedSkin || 'default',
         equippedSound: playerData.equippedSound || 'mechanical',
         equippedAvatar: playerData.equippedAvatar || 'cat',
@@ -834,6 +852,112 @@ class CloudSyncManager {
       return [];
     }
   }
+  /**
+   * 獲取指定班級所有同學之即時排行榜資料 (結合名冊學生資料與最新打字測驗成績)
+   */
+  async fetchClassRankings(className) {
+    if (!className) return [];
+    try {
+      const students = await this.fetchClassStudents(className);
+      let leaderboardRecords = [];
+
+      if (this.isFirebaseReady && this.db) {
+        try {
+          const snap = await this.db.collection('leaderboard')
+            .where('className', '==', className)
+            .get();
+          snap.forEach(doc => leaderboardRecords.push(doc.data()));
+        } catch (err) {
+          console.warn('拉取班級排行榜紀錄失敗:', err);
+        }
+      }
+
+      // 本機備援排行榜紀錄
+      try {
+        const local = JSON.parse(localStorage.getItem('typehero_local_leaderboard') || '[]');
+        local.filter(item => item.className === className).forEach(item => leaderboardRecords.push(item));
+      } catch (e) {}
+
+      // 統計每位座號的最高速成績
+      const bestBySeat = {};
+      leaderboardRecords.forEach(rec => {
+        const seat = String(rec.seatNumber || '').trim();
+        if (!seat) return;
+        if (!bestBySeat[seat] || (rec.wpm || 0) > (bestBySeat[seat].wpm || 0)) {
+          bestBySeat[seat] = {
+            wpm: rec.wpm || 0,
+            accuracy: rec.accuracy || 0,
+            lessonTitle: rec.lessonTitle || ''
+          };
+        }
+      });
+
+      // 將成績與學生名冊資料整合
+      const resultList = students.map(st => {
+        const seat = String(st.seatNumber || '').trim();
+        const score = bestBySeat[seat] || {};
+        const starsCount = (st.lessonStars && typeof st.lessonStars === 'object')
+          ? Object.values(st.lessonStars).reduce((sum, v) => sum + (Number(v) || 0), 0)
+          : 0;
+
+        return {
+          className: st.className || className,
+          seatNumber: seat,
+          realName: st.realName || '',
+          nickname: st.nickname || '',
+          displayName: st.nickname ? `${st.nickname} (${st.realName || seat + '號'})` : (st.realName || `${seat}號`),
+          wpm: score.wpm || 0,
+          accuracy: score.accuracy || (score.wpm ? 100 : 0),
+          lessonTitle: score.lessonTitle || '',
+          level: st.level || 1,
+          coins: Number(st.coins) || 0,
+          stars: starsCount,
+          hasScore: typeof score.wpm === 'number' && score.wpm > 0
+        };
+      });
+
+      // 若名冊尚無資料但排行榜已有紀錄
+      if (resultList.length === 0 && leaderboardRecords.length > 0) {
+        Object.keys(bestBySeat).forEach(seat => {
+          const score = bestBySeat[seat];
+          resultList.push({
+            className,
+            seatNumber: seat,
+            realName: '',
+            nickname: '',
+            displayName: `${seat}號`,
+            wpm: score.wpm || 0,
+            accuracy: score.accuracy || 0,
+            lessonTitle: score.lessonTitle || '',
+            level: 1,
+            coins: 0,
+            stars: 0,
+            hasScore: true
+          });
+        });
+      }
+
+      // 排序規則：有成績者優先依 WPM 降序（WPM 同者比準確率），未測驗者依座號升序排列
+      resultList.sort((a, b) => {
+        if (a.hasScore && !b.hasScore) return -1;
+        if (!a.hasScore && b.hasScore) return 1;
+        if (a.hasScore && b.hasScore) {
+          if (b.wpm !== a.wpm) return b.wpm - a.wpm;
+          return (b.accuracy || 0) - (a.accuracy || 0);
+        }
+        const numA = parseInt(a.seatNumber, 10);
+        const numB = parseInt(b.seatNumber, 10);
+        if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+        return String(a.seatNumber || '').localeCompare(String(b.seatNumber || ''));
+      });
+
+      return resultList;
+    } catch (e) {
+      console.error('產生班級排行榜失敗:', e);
+      return [];
+    }
+  }
+
 
   async adminUpdateStudentPassword(className, seatNumber, newPassword) {
     if (!this.isFirebaseReady || !this.db) return false;
@@ -886,7 +1010,7 @@ class CloudSyncManager {
         studentNo: keepStudentNo || '',
         academicYear: academicYear,
         level: 1,
-        coins: 100,
+        coins: 0,
         xp: 0,
         items: [],
         unlockedLessons: [],
@@ -895,7 +1019,12 @@ class CloudSyncManager {
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      console.log(`✅ 已解除 [${studentId}] 冒用綁定並還原基本學籍`);
+      // 同步清除本地該學生快取，確保星幣徹底歸零
+      localStorage.removeItem('typehero_player_data_' + studentId);
+      if (window.shopManager && window.shopManager.currentStudentId === studentId) {
+        window.shopManager.resetToDefault(studentId);
+      }
+      console.log(`✅ 已解除 [${studentId}] 冒用綁定並將星幣重設為0，保留真實學籍`);
       return true;
     } catch (e) {
       console.error('解除學生綁定失敗:', e);
@@ -1578,6 +1707,7 @@ class CloudSyncManager {
     } catch (e) {}
     allLessons[cleanClass] = lessonData;
     localStorage.setItem('typehero_custom_lessons', JSON.stringify(allLessons));
+      localStorage.removeItem('typehero_custom_lesson');
     // 同時相容單一 lesson 鍵名供舊元件讀取
     localStorage.setItem('typehero_custom_lesson', JSON.stringify(lessonData));
 
@@ -1631,18 +1761,25 @@ class CloudSyncManager {
   }
 
   async fetchAllCustomLessonsFromCloud() {
-    const list = [];
     if (this.isFirebaseReady && this.db) {
       try {
         const snapshot = await this.db.collection('custom_lessons').get();
-        snapshot.forEach(doc => list.push(doc.data()));
-        if (list.length > 0) return list;
+        const list = [];
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          if (d && d.targetClass) list.push(d);
+        });
+        // 雲端是唯一真實來源，更新本地快取
+        const cache = {};
+        list.forEach(item => { cache[item.targetClass] = item; });
+        localStorage.setItem('typehero_custom_lessons', JSON.stringify(cache));
+        return list;
       } catch (err) {
         console.warn('拉取全部特訓清單失敗:', err);
       }
     }
 
-    // 本地備援
+    // 本地備援（僅離線時）
     try {
       const allLessons = JSON.parse(localStorage.getItem('typehero_custom_lessons') || '{}');
       return Object.values(allLessons);
