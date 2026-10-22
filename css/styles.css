@@ -804,7 +804,7 @@ body.in-fullscreen-mode .course-pass-tip {
   font-size: 0.68rem;
 }
 
-/* 鍵盤守護小精靈伴學小卡 (Proposal IV.1) */
+/* 鍵盤守護小精靈伴學小卡 (Proposal IV.1: 向上移緊湊排列，提升視覺陪伴感) */
 .mascot-companion-card {
   background: transparent;
   border: none;
@@ -815,8 +815,8 @@ body.in-fullscreen-mode .course-pass-tip {
   justify-content: center;
   position: relative;
   overflow: visible;
-  padding: 1.25rem 0.5rem 0.5rem;
-  margin-top: 0.5rem;
+  padding: 0.45rem 0.5rem 0.45rem;
+  margin-top: 0.2rem;
 }
 
 .mascot-avatar {

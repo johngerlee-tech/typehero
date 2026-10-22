@@ -1278,51 +1278,31 @@ function loadCategory(category) {
 
   const badgeEl = document.getElementById('stage-mode-badge');
   const inputEl = document.getElementById('typing-input');
-  const imeIcon = document.getElementById('ime-guide-icon');
-  const imeIconBg = document.getElementById('ime-guide-icon-bg');
-  const imeModeText = document.getElementById('ime-guide-mode-text');
-  const imeHintText = document.getElementById('ime-guide-hint-text');
 
   if (category === 'zhuyin') {
-    badgeEl.innerText = 'ㄅ 台灣大千注音符號盲打特訓';
+    if (badgeEl) badgeEl.innerText = 'ㄅ 台灣大千注音符號盲打特訓';
     if (inputEl) {
       inputEl.setAttribute('inputmode', 'latin');
       inputEl.setAttribute('lang', 'en');
     }
-    if (imeIcon) imeIcon.innerText = '🔤';
-    if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #38bdf8, #0284c7)';
-    if (imeModeText) imeModeText.innerText = '英數 / 簡易注音免選字';
-    if (imeHintText) imeHintText.innerText = '保持英數狀態，直接敲鍵盲打（免切換、免選字）';
   } else if (category === 'chinese') {
-    badgeEl.innerText = '📖 國小生字詞與常用標點（免選字簡易注音）';
+    if (badgeEl) badgeEl.innerText = '📖 國小生字詞與常用標點（免選字簡易注音）';
     if (inputEl) {
       inputEl.setAttribute('inputmode', 'latin');
       inputEl.setAttribute('lang', 'en');
     }
-    if (imeIcon) imeIcon.innerText = '🔤';
-    if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
-    if (imeModeText) imeModeText.innerText = '英數 / 簡易注音免選字';
-    if (imeHintText) imeHintText.innerText = '依生字注音拆解直接敲鍵，自動完成不需選字換字！';
   } else if (category === 'custom') {
-    badgeEl.innerText = '🏫 教師課堂自訂特訓關卡';
+    if (badgeEl) badgeEl.innerText = '🏫 教師課堂自訂特訓關卡';
     if (inputEl) {
       inputEl.setAttribute('inputmode', 'latin');
       inputEl.setAttribute('lang', 'en');
     }
-    if (imeIcon) imeIcon.innerText = '🏫';
-    if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-    if (imeModeText) imeModeText.innerText = '英數 / 簡易注音免選字';
-    if (imeHintText) imeHintText.innerText = '保持英數狀態，依指定題目直接敲鍵盲打（免選字）';
   } else {
-    badgeEl.innerText = '🔤 國小標準英文盲打挑戰';
+    if (badgeEl) badgeEl.innerText = '🔤 國小標準英文盲打挑戰';
     if (inputEl) {
       inputEl.setAttribute('inputmode', 'latin');
       inputEl.setAttribute('lang', 'en');
     }
-    if (imeIcon) imeIcon.innerText = '🔤';
-    if (imeIconBg) imeIconBg.style.background = 'linear-gradient(135deg, #38bdf8, #0284c7)';
-    if (imeModeText) imeModeText.innerText = '英數 / 英文盲打模式';
-    if (imeHintText) imeHintText.innerText = '保持英數狀態，直接敲擊實體按鍵盲打';
   }
 
   // 繪製關卡地圖卡片 (含鎖定判定)

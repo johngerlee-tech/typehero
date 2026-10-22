@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeHero 鍵盤英雄 - 溪洲國小打字冒險學院</title>
   <meta name="description" content="專為溪洲國小學童設計的遊戲化打字冒險學院，涵蓋大千繁體注音符號盲打、全形標點符號、常用中文生字詞與國小必備英語單字。支援連擊特效、虛擬幣商城與 Firebase 雲端班級排行榜。">
-  <link rel="stylesheet" href="css/styles.css?v=2.9.3">
+  <link rel="stylesheet" href="css/styles.css?v=2.9.4">
   
   <!-- Firebase SDK (以官方相容 Web 版本載入，支援 Auth Google 登入與 Firestore 雲端資料庫) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -188,21 +188,7 @@
           <div class="combo-badge-wrapper" id="combo-badge-wrapper"></div>
         </div>
 
-        <!-- 智慧輸入法指引卡片 (醒目提示當前輸入法狀態) -->
-        <div class="stat-box ime-guide-box" id="ime-guide-box">
-          <div class="stat-icon" id="ime-guide-icon-bg" style="background: linear-gradient(135deg, #38bdf8, #0284c7);">
-            <span id="ime-guide-icon">🔤</span>
-          </div>
-          <div class="stat-content">
-            <span class="stat-title" style="color:var(--brand-primary); font-weight:800;">輸入法模式</span>
-            <span id="ime-guide-mode-text" style="font-size: 0.8rem; font-weight: 700; color: var(--text-main);">英數 / 簡易注音免選字</span>
-            <span id="ime-guide-hint-text" style="font-size: 0.68rem; color: var(--text-muted); line-height:1.25; margin-top:2px;">
-              保持英數狀態，直接敲鍵盲打（免切換、免選字）
-            </span>
-          </div>
-        </div>
-
-        <!-- 鍵盤守護小精靈伴學 (Proposal IV.1) -->
+        <!-- 鍵盤守護小精靈伴學 (Proposal IV.1: 移除冗餘輸入法指引後上移，增強陪伴感) -->
         <div class="mascot-companion-card" id="mascot-companion-card">
           <div class="mascot-avatar" id="mascot-avatar">🐶</div>
           <div class="mascot-speech-bubble" id="mascot-speech-bubble">
@@ -893,6 +879,6 @@
   <script src="js/lessons.js?v=2.5.2"></script>
   <script src="js/shop.js?v=3.2.0"></script>
   <script src="js/firebase-config.js?v=3.3.1"></script>
-  <script src="js/app.js?v=3.3.2"></script>
+  <script src="js/app.js?v=3.3.3"></script>
 </body>
 </html>
