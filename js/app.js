@@ -119,6 +119,9 @@ function getPassAccuracyThreshold() {
   return (!isNaN(num) && num >= 30 && num <= 100) ? num : 70;
 }
 
+// 相容舊有常數引用防禦（預設通關門檻 70%）
+const PASS_ACCURACY_THRESHOLD = 70;
+
 window.updatePassAccuracyUI = function(customVal) {
   const val = (typeof customVal === 'number') ? customVal : getPassAccuracyThreshold();
   const tipVal = document.getElementById('pass-acc-tip-val');
@@ -1797,8 +1800,9 @@ function finishLesson() {
     ? Math.round((gameState.correctCount / gameState.totalKeyStrokes) * 100)
     : 0;
 
-  // 判斷是否通過標準（準確率需達 70%）
-  const isPassed = (finalAcc >= PASS_ACCURACY_THRESHOLD);
+  // 判斷是否通過標準（可由管理者後台動態調整門檻，預設 70%）
+  const passThreshold = getPassAccuracyThreshold();
+  const isPassed = (finalAcc >= passThreshold);
 
   const bannerEl = document.getElementById('modal-result-banner');
   const iconEl = document.getElementById('modal-result-icon');
