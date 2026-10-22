@@ -653,39 +653,8 @@ function processCommittedText(text) {
         highlightTarget();
       }
     } else {
-      // 3. 容錯處理：若當前步驟為一聲空白鍵，而學生直接按下下一個字的起首注音鍵，自動完成前一個字！
-      if (currentStep.key === ' ' && gameState.currentIndex + 1 < targetText.length) {
-        const nextChar = targetText[gameState.currentIndex + 1];
-        const nextSubKeys = getCharSubKeys(nextChar);
-        if (nextSubKeys.length > 0 && isSubKeyMatch(typedChar, nextSubKeys[0])) {
-          streamSpans[gameState.currentIndex].className = 'char-correct';
-          gameState.currentIndex++;
-          gameState.subCharIndex = 1; // 下一個字的第一個鍵已命中！
-          gameState.correctCount += 2;
-          gameState.comboCount++;
-          if (gameState.comboCount > gameState.comboMax) gameState.comboMax = gameState.comboCount;
-          updateComboUI(gameState.comboCount);
-
-          if (window.soundEngine) window.soundEngine.playKey('std', gameState.comboCount);
-
-          if (nextSubKeys.length === 1) {
-            streamSpans[gameState.currentIndex].className = 'char-correct';
-            gameState.currentIndex++;
-            gameState.subCharIndex = 0;
-          }
-
-          if (gameState.currentIndex >= targetText.length) {
-            finishLesson();
-            return;
-          } else {
-            streamSpans[gameState.currentIndex].className = 'char-pending char-cursor';
-            highlightTarget();
-          }
-          continue;
-        }
-      }
-
-      // 4. 輸入錯誤：震動警示與中斷連擊，但不卡關死當，讓學生可立刻按出正確按鍵
+      // 3. 輸入錯誤（含空白鍵未按）：震動警示與中斷連擊，強制必須按壓空白鍵才能推進
+      // （移除跳過空白鍵的容錯處理，確保學生確實練習空白鍵敲擊）
       gameState.comboCount = 0;
       updateComboUI(0);
       if (typeof updateMascot === 'function') updateMascot('wrong');
