@@ -1143,11 +1143,61 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeStudentForCoins = null;
   let activeCoinMode = 'add'; // 'add' | 'set' | 'subtract'
 
+  // 原生 Prompt 備用救援機制（保證在任何極端情境下老師點擊都 100% 絕對有反應）
+  async function fallbackPromptAdjustCoins(className, student) {
+    const studentDesc = `${className} ${student.seatNumber}號 ${student.realName || student.nickname || '學員'}`;
+    const cur = Number(student.coins) || 0;
+    const input = prompt(
+      `【${studentDesc}】目前持有星幣：🪙 ${cur} 幣\n\n請輸入欲補發增加的星幣數量（例如 100 或 350）：\n• 輸入正數（如 100）直接增加\n• 輸入負數（如 -50）扣除\n• 或輸入 =500 直接指定設為 500 幣`,
+      '100'
+    );
+    if (input === null) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
+
+    let mode = 'add';
+    let val = 0;
+    if (trimmed.startsWith('=')) {
+      mode = 'set';
+      val = parseInt(trimmed.substring(1).trim(), 10);
+    } else {
+      const num = parseInt(trimmed, 10);
+      if (num < 0) {
+        mode = 'subtract';
+        val = Math.abs(num);
+      } else {
+        mode = 'add';
+        val = num;
+      }
+    }
+
+    if (isNaN(val)) {
+      alert('⚠️ 請輸入有效的數字！');
+      return;
+    }
+
+    if (window.cloudSync && window.cloudSync.adminAdjustStudentCoins) {
+      const res = await window.cloudSync.adminAdjustStudentCoins(className, student.seatNumber, val, mode, '教師課堂補發');
+      if (res && res.success) {
+        alert(`✅ 成功！已為【${studentDesc}】更新星幣！\n\n🪙 調整前：${res.oldCoins} 幣\n🪙 調整後：${res.newCoins} 幣`);
+        loadStudentsRoster();
+      } else {
+        alert(`❌ 調整失敗：${res ? res.error : '未知錯誤'}`);
+      }
+    }
+  }
+
   function openStudentCoinsModal(className, student) {
+    const modal = document.getElementById('modal-adjust-coins');
+    if (!modal) {
+      console.warn('未找到 modal-adjust-coins 彈窗，啟動備用 Prompt 處置');
+      fallbackPromptAdjustCoins(className, student);
+      return;
+    }
+
     activeStudentForCoins = { className, ...student };
     activeCoinMode = 'add';
 
-    const modal = document.getElementById('modal-adjust-coins');
     const descEl = document.getElementById('adjust-coins-student-desc');
     const levelEl = document.getElementById('adjust-coins-student-level');
     const noEl = document.getElementById('adjust-coins-student-no');
@@ -1161,17 +1211,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (noEl) noEl.innerText = student.studentNo || '-';
     if (nickEl) nickEl.innerText = student.nickname || '未設定';
     if (curValEl) curValEl.innerText = student.coins || 0;
-    if (inputVal) inputVal.value = '100';
+    if (inputVal) {
+      inputVal.value = '100';
+      setTimeout(() => inputVal.focus(), 150);
+    }
 
     updateCoinModeUI('add');
     refreshCoinsPreview();
 
-    if (modal) modal.style.display = 'flex';
+    // 核心修復：modal-backdrop 必須使用 active class 才能呈現 opacity: 1 與 pointer-events: auto
+    modal.classList.add('active');
   }
 
   function closeAdjustCoinsModal() {
     const modal = document.getElementById('modal-adjust-coins');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.classList.remove('active');
     activeStudentForCoins = null;
   }
 
@@ -1284,6 +1338,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (btnCloseAdjustCoins) btnCloseAdjustCoins.onclick = closeAdjustCoinsModal;
   if (btnCancelAdjustCoins) btnCancelAdjustCoins.onclick = closeAdjustCoinsModal;
+  const modalAdjustBackdrop = document.getElementById('modal-adjust-coins');
+  if (modalAdjustBackdrop) {
+    modalAdjustBackdrop.addEventListener('click', (e) => {
+      if (e.target === modalAdjustBackdrop) closeAdjustCoinsModal();
+    });
+  }
 
   const modeAdd = document.getElementById('btn-mode-add');
   const modeSet = document.getElementById('btn-mode-set');
@@ -1354,8 +1414,17 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('請先在上方「班級篩選」下拉選單選擇班級！');
       return;
     }
+    const modalBatch = document.getElementById('modal-batch-coins');
+    if (!modalBatch) {
+      alert('未找到全班批次補發彈窗');
+      return;
+    }
+
     if (batchClassNameEl) batchClassNameEl.innerText = targetClass;
-    if (inputBatchVal) inputBatchVal.value = '100';
+    if (inputBatchVal) {
+      inputBatchVal.value = '100';
+      setTimeout(() => inputBatchVal.focus(), 150);
+    }
 
     // 統計當前班級已登載名額
     let count = 0;
@@ -1365,11 +1434,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (batchCountEl) batchCountEl.innerText = count || '全班';
 
-    if (modalBatch) modalBatch.style.display = 'flex';
+    modalBatch.classList.add('active');
   }
 
   function closeBatchCoinsModal() {
-    if (modalBatch) modalBatch.style.display = 'none';
+    const modalBatch = document.getElementById('modal-batch-coins');
+    if (modalBatch) modalBatch.classList.remove('active');
   }
 
   if (btnBatchCoins) {
@@ -1385,6 +1455,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (btnCloseBatch) btnCloseBatch.onclick = closeBatchCoinsModal;
   if (btnCancelBatch) btnCancelBatch.onclick = closeBatchCoinsModal;
+  const modalBatchBackdrop = document.getElementById('modal-batch-coins');
+  if (modalBatchBackdrop) {
+    modalBatchBackdrop.addEventListener('click', (e) => {
+      if (e.target === modalBatchBackdrop) closeBatchCoinsModal();
+    });
+  }
+
+  // 匯出至全域 window，確保無論如何均可直接存取調用
+  window.openStudentCoinsModal = openStudentCoinsModal;
+  window.openBatchCoinsModal = openBatchCoinsModal;
+  window.fallbackPromptAdjustCoins = fallbackPromptAdjustCoins;
 
   // 批次快速預設值
   const batchPresets = document.querySelectorAll('.btn-batch-preset');
