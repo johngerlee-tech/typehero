@@ -9,12 +9,19 @@ class ShopManager {
     this.storageKey = 'typehero_player_data';
     this.currentStudentId = null;
 
-    // 若本地已有現行學生身份，自動綁定至該帳號
-    if (window.cloudSync && window.cloudSync.profile && window.cloudSync.profile.className && window.cloudSync.profile.seatNumber) {
+    // 優先自 localStorage 檢查現行已登入之學生身分（避免依賴腳本載入順序）
+    try {
+      const savedProfile = JSON.parse(localStorage.getItem('typehero_student_profile') || 'null');
+      if (savedProfile && savedProfile.hasRegistered && savedProfile.className && savedProfile.seatNumber) {
+        this.currentStudentId = `${savedProfile.className}_${savedProfile.seatNumber}`;
+      }
+    } catch (e) {}
+
+    if (!this.currentStudentId && window.cloudSync && window.cloudSync.profile && window.cloudSync.profile.className && window.cloudSync.profile.seatNumber) {
       this.currentStudentId = `${window.cloudSync.profile.className}_${window.cloudSync.profile.seatNumber}`;
     }
 
-    this.data = this.loadData(this.currentStudentId);
+    // 先定義商品目錄（必須在 loadData 之前，供 loadData 驗證合法性）
     this.catalog = {
       skins: [
         { id: 'default', name: '活力科技深藍', price: 0, preview: '💻', desc: '經典電競深藍配色，護眼清晰', themeClass: '' },
@@ -74,6 +81,9 @@ class ShopManager {
       ]
     };
 
+    // 目錄就緒後載入存檔
+    this.data = this.loadData(this.currentStudentId);
+
     // 套用初始外觀與音效
     this.applySkin(this.data.equippedSkin);
     if (window.soundEngine) {
@@ -115,7 +125,7 @@ class ShopManager {
   /**
    * 讀取存檔（優先讀取學生獨立存檔）
    */
-  loadData(studentId = null) {
+  loadData(studentId = this.currentStudentId) {
     const key = this.getStorageKey(studentId);
     const raw = localStorage.getItem(key);
     if (raw) {
@@ -134,11 +144,13 @@ class ShopManager {
         parsed.level = Number(parsed.level) >= 1 ? Number(parsed.level) : 1;
         parsed.equippedSkin = parsed.equippedSkin || 'default';
         parsed.equippedSound = parsed.equippedSound || 'mechanical';
-        parsed.equippedAvatar = (parsed.equippedAvatar && this.catalog.avatars.some(a => a.id === parsed.equippedAvatar)) ? parsed.equippedAvatar : 'knight';
-        parsed.equippedPet = (parsed.equippedPet && this.catalog.pets.some(p => p.id === parsed.equippedPet)) ? parsed.equippedPet : 'shiba';
+        const avatarCatalog = (this.catalog && this.catalog.avatars) ? this.catalog.avatars : [];
+        parsed.equippedAvatar = (parsed.equippedAvatar && avatarCatalog.some(a => a.id === parsed.equippedAvatar)) ? parsed.equippedAvatar : 'knight';
+        const petCatalog = (this.catalog && this.catalog.pets) ? this.catalog.pets : [];
+        parsed.equippedPet = (parsed.equippedPet && petCatalog.some(p => p.id === parsed.equippedPet)) ? parsed.equippedPet : 'shiba';
         return parsed;
       } catch (e) {
-        console.error('讀取存檔失敗，使用初始設定:', e);
+        console.error('讀取存檔解析失敗，安全使用初始設定:', e);
       }
     }
     return this.getDefaultPlayerData();
@@ -205,44 +217,53 @@ class ShopManager {
   restoreFromCloud(cloudData) {
     if (!cloudData) return;
 
-    // 1. 金幣與經驗值（完全依據雲端存檔還原）
+    // 讀取既有本機存檔進行雙向防禦性合併（取較高數值，保證進度只增不減，徹底防止網路延遲歸零覆蓋）
+    const localData = this.loadData(this.currentStudentId);
+
+    // 1. 金幣與經驗值（取本機與雲端最大值，防止斷線或空快照覆蓋）
     const cloudCoins = Number(cloudData.coins);
-    const coins = (!isNaN(cloudCoins) && cloudCoins >= 0) ? cloudCoins : 0;
+    const validCloudCoins = (!isNaN(cloudCoins) && cloudCoins >= 0) ? cloudCoins : 0;
+    const localCoins = Number(localData.coins) || 0;
+    const coins = Math.max(localCoins, validCloudCoins);
 
     const cloudExp = Number(cloudData.exp);
-    const exp = (!isNaN(cloudExp) && cloudExp >= 0) ? cloudExp : 0;
-    const level = Number(cloudData.level) >= 1 ? Number(cloudData.level) : (Math.floor(exp / 200) + 1);
+    const validCloudExp = (!isNaN(cloudExp) && cloudExp >= 0) ? cloudExp : 0;
+    const localExp = Number(localData.exp) || 0;
+    const exp = Math.max(localExp, validCloudExp);
 
-    // 2. 關卡星等（完全以該座號雲端存檔為準）
-    const lessonStars = (cloudData.lessonStars && typeof cloudData.lessonStars === 'object')
-      ? { ...cloudData.lessonStars }
-      : {};
+    const localLevel = Number(localData.level) || 1;
+    const cloudLevelNum = Number(cloudData.level) || 1;
+    const level = Math.max(localLevel, cloudLevelNum, Math.floor(exp / 200) + 1);
 
-    // 3. 背包解鎖清單（確保預設項目存在）
-    const unlockedSkins = Array.isArray(cloudData.unlockedSkins) && cloudData.unlockedSkins.length
-      ? Array.from(new Set(['default', ...cloudData.unlockedSkins]))
-      : ['default'];
-    const unlockedSounds = Array.isArray(cloudData.unlockedSounds) && cloudData.unlockedSounds.length
-      ? Array.from(new Set(['mechanical', ...cloudData.unlockedSounds]))
-      : ['mechanical'];
-    const unlockedAvatars = Array.isArray(cloudData.unlockedAvatars) && cloudData.unlockedAvatars.length
-      ? Array.from(new Set(['cat', ...cloudData.unlockedAvatars]))
-      : ['cat'];
+    // 2. 關卡星等：合併本機與雲端星等（取最高星）
+    const lessonStars = Object.assign({}, localData.lessonStars || {});
+    if (cloudData.lessonStars && typeof cloudData.lessonStars === 'object') {
+      for (const [lid, cStar] of Object.entries(cloudData.lessonStars)) {
+        lessonStars[lid] = Math.max(lessonStars[lid] || 0, Number(cStar) || 0);
+      }
+    }
 
-    // 4. 成就解鎖清單
-    const unlockedAchievements = Array.isArray(cloudData.unlockedAchievements)
-      ? [...cloudData.unlockedAchievements]
-      : [];
+    // 3. 背包解鎖清單（聯集合併，確保已購買的皮膚、音效、頭像與寵物絕對不丟失）
+    const unlockedSkins = Array.from(new Set(['default', ...(cloudData.unlockedSkins || []), ...(localData.unlockedSkins || [])]));
+    const unlockedSounds = Array.from(new Set(['mechanical', ...(cloudData.unlockedSounds || []), ...(localData.unlockedSounds || [])]));
+    const unlockedAvatars = Array.from(new Set(['knight', ...(cloudData.unlockedAvatars || []), ...(localData.unlockedAvatars || [])]));
+    const unlockedPets = Array.from(new Set(['shiba', ...(cloudData.unlockedPets || []), ...(localData.unlockedPets || [])]));
 
-    // 5. 裝備狀態（驗證合法性）
-    let equippedSkin = cloudData.equippedSkin || 'default';
+    // 4. 成就解鎖清單（聯集合併）
+    const unlockedAchievements = Array.from(new Set([...(cloudData.unlockedAchievements || []), ...(localData.unlockedAchievements || [])]));
+
+    // 5. 裝備狀態（優先取雲端設定，若未擁有則取本地或預設）
+    let equippedSkin = cloudData.equippedSkin || localData.equippedSkin || 'default';
     if (!unlockedSkins.includes(equippedSkin)) equippedSkin = 'default';
 
-    let equippedSound = cloudData.equippedSound || 'mechanical';
+    let equippedSound = cloudData.equippedSound || localData.equippedSound || 'mechanical';
     if (!unlockedSounds.includes(equippedSound)) equippedSound = 'mechanical';
 
-    let equippedAvatar = cloudData.equippedAvatar || 'cat';
-    if (!unlockedAvatars.includes(equippedAvatar)) equippedAvatar = 'cat';
+    let equippedAvatar = cloudData.equippedAvatar || localData.equippedAvatar || 'knight';
+    if (!unlockedAvatars.includes(equippedAvatar)) equippedAvatar = 'knight';
+
+    let equippedPet = cloudData.equippedPet || localData.equippedPet || 'shiba';
+    if (!unlockedPets.includes(equippedPet)) equippedPet = 'shiba';
 
     // 完整重設該學生的資料結構
     this.data = {
@@ -256,6 +277,8 @@ class ShopManager {
       equippedSound,
       unlockedAvatars,
       equippedAvatar,
+      unlockedPets,
+      equippedPet,
       unlockedAchievements
     };
 

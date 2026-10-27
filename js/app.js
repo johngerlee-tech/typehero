@@ -2514,7 +2514,7 @@ async function loadCustomLessonForClass(targetClass) {
     // 若當前正處於自訂分類中，即時重新繪製關卡與載入第一關
     if (gameState.currentCategory === 'custom') {
       renderLessonsGrid(window.COURSES.custom);
-      loadLesson(window.COURSES.custom[0]);
+      selectLesson(window.COURSES.custom[0].id);
     }
     return true;
   } else {
@@ -2530,7 +2530,7 @@ async function loadCustomLessonForClass(targetClass) {
     if (classDropdown && queryClass) classDropdown.value = queryClass;
     if (gameState.currentCategory === 'custom') {
       renderLessonsGrid(window.COURSES.custom);
-      loadLesson(window.COURSES.custom[0]);
+      selectLesson(window.COURSES.custom[0].id);
     }
     return false;
   }

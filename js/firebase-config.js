@@ -56,6 +56,20 @@ class CloudSyncManager {
 
     // 初始化 Firebase
     this.initFirebase();
+
+    // 本地已有現行學生身份時，自動將 ShopManager 綁定並載入該學生專屬進度
+    if (this.profile && this.profile.hasRegistered && this.profile.className && this.profile.seatNumber) {
+      const studentId = `${this.profile.className}_${this.profile.seatNumber}`;
+      if (window.shopManager) {
+        window.shopManager.currentStudentId = studentId;
+        window.shopManager.data = window.shopManager.loadData(studentId);
+        window.shopManager.applySkin(window.shopManager.data.equippedSkin);
+        if (window.soundEngine) {
+          window.soundEngine.setSoundPack(window.shopManager.data.equippedSound);
+        }
+        window.shopManager.updateUI();
+      }
+    }
   }
 
   // ==========================================
@@ -573,9 +587,12 @@ class CloudSyncManager {
         console.log(`✅ Firebase 雲端資料庫初始化成功！專案 ID: [${config.projectId}]`);
         this.updateStatusBadge('connected', '雲端已連線');
 
-        // 初始化成功後自動自雲端拉取最新班級名冊與管理密碼
-        setTimeout(() => {
-          this.fetchCloudClassList();
+        // 初始化成功後自動自雲端拉取最新班級名冊與管理密碼，並同步當前學生雲端存檔
+        setTimeout(async () => {
+          await this.fetchCloudClassList();
+          if (this.profile && this.profile.hasRegistered && this.profile.className && this.profile.seatNumber) {
+            await this.syncCurrentStudentFromCloud();
+          }
         }, 100);
 
       } catch (err) {
@@ -739,11 +756,55 @@ class CloudSyncManager {
   }
 
   // ==========================================
+  // 背景自動同步與還原當前已登入學生之雲端最新進度
+  // ==========================================
+  async syncCurrentStudentFromCloud() {
+    if (!this.isFirebaseReady || !this.db) return false;
+    if (!this.profile || !this.profile.className || !this.profile.seatNumber) return false;
+
+    try {
+      const cleanClass = String(this.profile.className).trim();
+      const rawSeat = String(this.profile.seatNumber).trim();
+      const cleanSeat = /^\d+$/.test(rawSeat) ? String(parseInt(rawSeat, 10)) : rawSeat;
+      let studentId = `${cleanClass}_${cleanSeat}`;
+
+      let docSnap = await this.db.collection('students').doc(studentId).get();
+      if (!docSnap.exists) {
+        // 嘗試補零形式 (如 "5年1班_05")
+        const altSeat = /^\d+$/.test(rawSeat) ? String(rawSeat).padStart(2, '0') : rawSeat;
+        const altDocId = `${cleanClass}_${altSeat}`;
+        if (altDocId !== studentId) {
+          const altSnap = await this.db.collection('students').doc(altDocId).get();
+          if (altSnap.exists) {
+            docSnap = altSnap;
+            studentId = altDocId;
+          }
+        }
+      }
+
+      if (docSnap.exists) {
+        const cloudData = docSnap.data();
+        if (window.shopManager) {
+          window.shopManager.switchToStudent(studentId, cloudData);
+        }
+        console.log(`☁️ 已在背景同步並合併學生 [${studentId}] 的雲端最新進度 (🪙 ${window.shopManager ? window.shopManager.data.coins : 0} 幣, Lv.${window.shopManager ? window.shopManager.data.level : 1})！`);
+        return true;
+      }
+    } catch (e) {
+      console.warn('背景同步雲端學生進度提示 (離線或延遲):', e);
+    }
+    return false;
+  }
+
+  // ==========================================
   // 雙向雲端漫遊核心：拉取學生雲端存檔 (換電腦時自動還原 & 密碼驗證)
   // ==========================================
   async loadProfileFromCloud(className, seatNumber, inputPassword) {
     if (!className || !seatNumber) return { success: false, reason: '缺少班級或座號' };
-    const studentId = `${className}_${seatNumber}`;
+    const cleanClass = String(className).trim();
+    const rawSeat = String(seatNumber).trim();
+    const cleanSeat = /^\d+$/.test(rawSeat) ? String(parseInt(rawSeat, 10)) : rawSeat;
+    let studentId = `${cleanClass}_${cleanSeat}`;
 
     // 離線或 Firebase 尚未就緒時的安全切換
     if (!this.isFirebaseReady || !this.db) {
@@ -761,7 +822,21 @@ class CloudSyncManager {
 
     try {
       console.log(`🔍 正在為 [${studentId}] 查詢雲端進度...`);
-      const docSnap = await this.db.collection('students').doc(studentId).get();
+      let docSnap = await this.db.collection('students').doc(studentId).get();
+
+      // 智慧座號防呆：若無此座號文件，嘗試雙位數補零 (如 "1" -> "01")
+      if (!docSnap.exists) {
+        const altSeat = /^\d+$/.test(rawSeat) ? String(rawSeat).padStart(2, '0') : rawSeat;
+        const altId = `${cleanClass}_${altSeat}`;
+        if (altId !== studentId) {
+          const altDoc = await this.db.collection('students').doc(altId).get();
+          if (altDoc.exists) {
+            docSnap = altDoc;
+            studentId = altId;
+            console.log(`💡 成功自動媒合補零座號雲端文件: [${studentId}]`);
+          }
+        }
+      }
 
       if (docSnap.exists) {
         const cloudData = docSnap.data();
@@ -817,10 +892,9 @@ class CloudSyncManager {
         this.showToast(`☁️ 歡迎回來！已自雲端漫遊還原【${displayName}】的專屬進度（Lv.${cloudData.level || 1} · ${cloudData.coins || 0} 星幣）`, 'success');
         return { success: true, data: cloudData };
       } else {
-        console.log(`ℹ️ 雲端尚無 [${studentId}] 的歷史進度，初始化全新乾淨新帳號模式...`);
-        // 新座號首次使用：註冊基本身份
-        this.profile.className = className;
-        this.profile.seatNumber = seatNumber;
+        console.log(`ℹ️ 雲端尚無 [${studentId}] 的歷史進度，建立全新專屬帳號...`);
+        this.profile.className = cleanClass;
+        this.profile.seatNumber = cleanSeat;
         this.profile.hasRegistered = true;
         if (inputPassword) {
           this.profile.password = String(inputPassword).trim();
@@ -828,12 +902,20 @@ class CloudSyncManager {
         localStorage.setItem(this.storageKey, JSON.stringify(this.profile));
         this.updateProfileBadgeUI();
 
-        // 關鍵修復：重設為全新乾淨的新帳號模式（Lv.1、0經驗、100金幣新手禮、零關卡星數、零成就、預設外觀）
+        // 防禦性檢查：若學生已在本機離線練習過且已累積金幣/進度，自動保留並上傳，絕不強制抹煞歸零！
         if (window.shopManager) {
-          window.shopManager.resetToDefault(studentId);
+          const existingLocal = window.shopManager.loadData(studentId);
+          if (existingLocal && (existingLocal.coins > 0 || existingLocal.exp > 0)) {
+            window.shopManager.currentStudentId = studentId;
+            window.shopManager.data = existingLocal;
+            window.shopManager.updateUI();
+            console.log(`✨ 檢測到學生 [${studentId}] 具備本機離線進度 (${existingLocal.coins} 幣, Lv.${existingLocal.level})，自動保留並建立雲端檔案！`);
+          } else {
+            window.shopManager.resetToDefault(studentId);
+          }
         }
 
-        // 將乾淨的新帳號存檔同步建立於雲端
+        // 將存檔同步建立於雲端
         await this.syncProfileToCloud();
 
         const displayName = this.profile.nickname || this.profile.realName || `${className} ${seatNumber}號`;
