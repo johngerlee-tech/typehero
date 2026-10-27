@@ -1048,22 +1048,38 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${realNameDisplay}</td>
         <td style="font-weight:bold; color:var(--brand-primary);">${st.nickname || '<span style="color:var(--text-muted); font-weight:normal;">未設定</span>'}</td>
         <td><span style="background:rgba(99,102,241,0.15); color:#818cf8; padding:0.12rem 0.45rem; border-radius:4px; font-weight:bold; font-size:0.75rem;">Lv.${st.level || 1}</span></td>
-        <td style="color:#fbbf24; font-weight:bold;">🪙 ${st.coins || 0}</td>
+        <td class="cell-student-coins" style="color:#fbbf24; font-weight:bold; cursor:pointer;" title="點擊為此學生手動補發或調整星幣">
+          <span style="display:inline-flex; align-items:center; gap:2px; padding:0.12rem 0.45rem; border-radius:4px; background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.25);">
+            🪙 ${st.coins || 0}
+          </span>
+        </td>
         <td>${pwdDisplay}</td>
         <td style="text-align:center; white-space:nowrap;">
-          <div style="display:flex; gap:0.35rem; justify-content:center; align-items:center;">
-            <button class="btn-secondary btn-modify-pwd" style="font-size:0.72rem; padding:0.25rem 0.5rem; border-color:var(--brand-primary); color:var(--brand-primary);" title="協助學生重設通行密碼">
+          <div style="display:flex; gap:0.3rem; justify-content:center; align-items:center; flex-wrap:nowrap;">
+            <button class="btn-secondary btn-adjust-coins" style="font-size:0.72rem; padding:0.25rem 0.5rem; border-color:#10b981; color:#34d399; background:rgba(16, 185, 129, 0.12); font-weight:bold;" title="【上課老師可用】增減或補發此學生星幣，即時救援損失或獎勵表現">
+              💰 補發金幣
+            </button>
+            <button class="btn-secondary btn-modify-pwd" style="font-size:0.72rem; padding:0.25rem 0.45rem; border-color:var(--brand-primary); color:var(--brand-primary);" title="協助學生重設通行密碼">
               ✏️ 改密碼
             </button>
-            <button class="btn-secondary btn-unbind-student" style="font-size:0.72rem; padding:0.25rem 0.55rem; border-color:#f59e0b; color:#fbbf24; background:rgba(245, 158, 11, 0.12); font-weight:bold;" title="【上課老師可用】解除他人冒用綁定，清空密碼與暱稱讓原座號學生重新登入">
+            <button class="btn-secondary btn-unbind-student" style="font-size:0.72rem; padding:0.25rem 0.5rem; border-color:#f59e0b; color:#fbbf24; background:rgba(245, 158, 11, 0.12); font-weight:bold;" title="【上課老師可用】解除他人冒用綁定，清空密碼與暱稱讓原座號學生重新登入">
               🔓 解除綁定
             </button>
-            <button class="btn-secondary btn-delete-student" style="font-size:0.72rem; padding:0.25rem 0.5rem; border-color:rgba(239, 68, 68, 0.5); color:#f87171; background:rgba(239, 68, 68, 0.08);" title="刪除此座號之雲端存檔">
+            <button class="btn-secondary btn-delete-student" style="font-size:0.72rem; padding:0.25rem 0.45rem; border-color:rgba(239, 68, 68, 0.5); color:#f87171; background:rgba(239, 68, 68, 0.08);" title="刪除此座號之雲端存檔">
               🗑️ 刪除
             </button>
           </div>
         </td>
       `;
+
+      // 0. 點擊「補發金幣」按鈕或星幣儲存格
+      const handleOpenCoinsModal = () => {
+        openStudentCoinsModal(selectedClass, st);
+      };
+      const btnCoins = tr.querySelector('.btn-adjust-coins');
+      if (btnCoins) btnCoins.onclick = handleOpenCoinsModal;
+      const cellCoins = tr.querySelector('.cell-student-coins');
+      if (cellCoins) cellCoins.onclick = handleOpenCoinsModal;
 
       // 1. 點擊「修改密碼」彈窗迅速為學生重設
       tr.querySelector('.btn-modify-pwd').onclick = async () => {
@@ -1119,6 +1135,297 @@ document.addEventListener('DOMContentLoaded', () => {
 
       studentsTableBody.appendChild(tr);
     });
+  }
+
+  // =========================================================================
+  // 5.5 學生星幣補發與手動調整功能（授課教師與最高管理員完全可用）
+  // =========================================================================
+  let activeStudentForCoins = null;
+  let activeCoinMode = 'add'; // 'add' | 'set' | 'subtract'
+
+  function openStudentCoinsModal(className, student) {
+    activeStudentForCoins = { className, ...student };
+    activeCoinMode = 'add';
+
+    const modal = document.getElementById('modal-adjust-coins');
+    const descEl = document.getElementById('adjust-coins-student-desc');
+    const levelEl = document.getElementById('adjust-coins-student-level');
+    const noEl = document.getElementById('adjust-coins-student-no');
+    const nickEl = document.getElementById('adjust-coins-student-nick');
+    const curValEl = document.getElementById('adjust-coins-current-val');
+    const inputVal = document.getElementById('input-adjust-coins-val');
+
+    const displayName = student.realName ? `${student.realName} (${student.nickname || '無暱稱'})` : (student.nickname || '學員');
+    if (descEl) descEl.innerText = `${className} ${student.seatNumber}號 ${displayName}`;
+    if (levelEl) levelEl.innerText = `Lv.${student.level || 1}`;
+    if (noEl) noEl.innerText = student.studentNo || '-';
+    if (nickEl) nickEl.innerText = student.nickname || '未設定';
+    if (curValEl) curValEl.innerText = student.coins || 0;
+    if (inputVal) inputVal.value = '100';
+
+    updateCoinModeUI('add');
+    refreshCoinsPreview();
+
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function closeAdjustCoinsModal() {
+    const modal = document.getElementById('modal-adjust-coins');
+    if (modal) modal.style.display = 'none';
+    activeStudentForCoins = null;
+  }
+
+  function updateCoinModeUI(mode) {
+    activeCoinMode = mode;
+    const modeBtns = document.querySelectorAll('.btn-coin-mode');
+    modeBtns.forEach(btn => {
+      const isCur = (btn.dataset.mode === mode);
+      if (isCur) {
+        btn.classList.add('active');
+        if (mode === 'add') {
+          btn.style.borderColor = '#10b981';
+          btn.style.color = '#34d399';
+          btn.style.background = 'rgba(16, 185, 129, 0.15)';
+        } else if (mode === 'set') {
+          btn.style.borderColor = '#38bdf8';
+          btn.style.color = '#38bdf8';
+          btn.style.background = 'rgba(56, 189, 248, 0.15)';
+        } else if (mode === 'subtract') {
+          btn.style.borderColor = '#ef4444';
+          btn.style.color = '#f87171';
+          btn.style.background = 'rgba(239, 68, 68, 0.15)';
+        }
+      } else {
+        btn.classList.remove('active');
+        btn.style.borderColor = 'var(--border-color)';
+        btn.style.color = 'var(--text-muted)';
+        btn.style.background = 'rgba(255, 255, 255, 0.04)';
+      }
+    });
+
+    const inputLabel = document.getElementById('adjust-coins-input-label');
+    const presetsLabel = document.getElementById('adjust-coins-presets-label');
+    const presetsBox = document.getElementById('adjust-coins-presets-buttons');
+
+    if (mode === 'add') {
+      if (inputLabel) inputLabel.innerText = '請輸入欲補發增加的星幣數量：';
+      if (presetsLabel) presetsLabel.innerText = '快速增額預設：';
+      if (presetsBox) {
+        presetsBox.innerHTML = `
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="100" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+100 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="200" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+200 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="300" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+300 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="400" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+400 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="500" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+500 幣</button>
+        `;
+        bindPresetClicks();
+      }
+    } else if (mode === 'set') {
+      if (inputLabel) inputLabel.innerText = '請輸入欲直接設定之總星幣數值：';
+      if (presetsLabel) presetsLabel.innerText = '快速指定數值：';
+      if (presetsBox) {
+        presetsBox.innerHTML = `
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="100" style="padding:0.25rem 0.6rem; font-size:0.75rem;">100 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="300" style="padding:0.25rem 0.6rem; font-size:0.75rem;">300 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="500" style="padding:0.25rem 0.6rem; font-size:0.75rem;">500 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="800" style="padding:0.25rem 0.6rem; font-size:0.75rem;">800 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="1000" style="padding:0.25rem 0.6rem; font-size:0.75rem;">1000 幣</button>
+        `;
+        bindPresetClicks();
+      }
+    } else if (mode === 'subtract') {
+      if (inputLabel) inputLabel.innerText = '請輸入欲扣除的星幣數量：';
+      if (presetsLabel) presetsLabel.innerText = '快速扣除預設：';
+      if (presetsBox) {
+        presetsBox.innerHTML = `
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="50" style="padding:0.25rem 0.6rem; font-size:0.75rem;">-50 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="100" style="padding:0.25rem 0.6rem; font-size:0.75rem;">-100 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="200" style="padding:0.25rem 0.6rem; font-size:0.75rem;">-200 幣</button>
+          <button type="button" class="btn-coin-preset btn-secondary" data-val="300" style="padding:0.25rem 0.6rem; font-size:0.75rem;">-300 幣</button>
+        `;
+        bindPresetClicks();
+      }
+    }
+  }
+
+  function bindPresetClicks() {
+    const presets = document.querySelectorAll('.btn-coin-preset');
+    const inputVal = document.getElementById('input-adjust-coins-val');
+    presets.forEach(p => {
+      p.onclick = () => {
+        if (inputVal) {
+          inputVal.value = p.dataset.val;
+          refreshCoinsPreview();
+        }
+      };
+    });
+  }
+
+  function refreshCoinsPreview() {
+    if (!activeStudentForCoins) return;
+    const current = Number(activeStudentForCoins.coins) || 0;
+    const inputVal = document.getElementById('input-adjust-coins-val');
+    const previewVal = document.getElementById('adjust-coins-preview-val');
+    const val = Math.max(0, parseInt(inputVal ? inputVal.value : '0', 10) || 0);
+
+    let projected = current;
+    if (activeCoinMode === 'add') projected = current + val;
+    else if (activeCoinMode === 'set') projected = val;
+    else if (activeCoinMode === 'subtract') projected = Math.max(0, current - val);
+
+    if (previewVal) previewVal.innerText = projected;
+  }
+
+  // 初始化星幣彈窗事件監聽
+  const btnCloseAdjustCoins = document.getElementById('btn-close-adjust-coins-modal');
+  const btnCancelAdjustCoins = document.getElementById('btn-cancel-adjust-coins');
+  const btnConfirmAdjustCoins = document.getElementById('btn-confirm-adjust-coins');
+  const inputAdjustCoins = document.getElementById('input-adjust-coins-val');
+
+  if (btnCloseAdjustCoins) btnCloseAdjustCoins.onclick = closeAdjustCoinsModal;
+  if (btnCancelAdjustCoins) btnCancelAdjustCoins.onclick = closeAdjustCoinsModal;
+
+  const modeAdd = document.getElementById('btn-mode-add');
+  const modeSet = document.getElementById('btn-mode-set');
+  const modeSub = document.getElementById('btn-mode-sub');
+  if (modeAdd) modeAdd.onclick = () => { updateCoinModeUI('add'); refreshCoinsPreview(); };
+  if (modeSet) modeSet.onclick = () => { updateCoinModeUI('set'); refreshCoinsPreview(); };
+  if (modeSub) modeSub.onclick = () => { updateCoinModeUI('subtract'); refreshCoinsPreview(); };
+
+  if (inputAdjustCoins) {
+    inputAdjustCoins.addEventListener('input', refreshCoinsPreview);
+  }
+  bindPresetClicks();
+
+  if (btnConfirmAdjustCoins) {
+    btnConfirmAdjustCoins.onclick = async () => {
+      if (!activeStudentForCoins) return;
+      const inputVal = document.getElementById('input-adjust-coins-val');
+      const amount = parseInt(inputVal ? inputVal.value : '0', 10);
+      if (isNaN(amount) || amount < 0) {
+        alert('⚠️ 請輸入有效的星幣數量！');
+        return;
+      }
+
+      btnConfirmAdjustCoins.disabled = true;
+      btnConfirmAdjustCoins.innerText = '⏳ 正在寫入雲端...';
+
+      try {
+        if (window.cloudSync && window.cloudSync.adminAdjustStudentCoins) {
+          const res = await window.cloudSync.adminAdjustStudentCoins(
+            activeStudentForCoins.className,
+            activeStudentForCoins.seatNumber,
+            amount,
+            activeCoinMode,
+            '授課教師課堂調整'
+          );
+          if (res && res.success) {
+            alert(`✅ 成功！已為【${activeStudentForCoins.className} ${activeStudentForCoins.seatNumber}號】更新星幣！\n\n🪙 調整前：${res.oldCoins} 幣\n🪙 調整後：${res.newCoins} 幣 (異動: ${res.delta >= 0 ? '+' : ''}${res.delta})\n\n數值已直接回存雲端資料庫，學童無論換電腦或新關卡重載皆會完整保留！`);
+            closeAdjustCoinsModal();
+            loadStudentsRoster();
+          } else {
+            alert(`❌ 調整失敗：${res ? res.error : '未知錯誤，請檢查網路連線'}`);
+          }
+        }
+      } catch (err) {
+        alert(`❌ 發生例外錯誤：${err.message}`);
+      } finally {
+        btnConfirmAdjustCoins.disabled = false;
+        btnConfirmAdjustCoins.innerText = '💾 確定儲存並同步至雲端';
+      }
+    };
+  }
+
+  // -------------------------------------------------------------
+  // 全班批次補發星幣彈窗邏輯
+  // -------------------------------------------------------------
+  const btnBatchCoins = document.getElementById('admin-btn-batch-add-coins');
+  const modalBatch = document.getElementById('modal-batch-coins');
+  const btnCloseBatch = document.getElementById('btn-close-batch-coins-modal');
+  const btnCancelBatch = document.getElementById('btn-cancel-batch-coins');
+  const btnConfirmBatch = document.getElementById('btn-confirm-batch-coins');
+  const inputBatchVal = document.getElementById('input-batch-coins-val');
+  const inputBatchReason = document.getElementById('input-batch-coins-reason');
+  const batchClassNameEl = document.getElementById('batch-coins-class-name');
+  const batchCountEl = document.getElementById('batch-coins-student-count');
+
+  function openBatchCoinsModal(targetClass) {
+    if (!targetClass) {
+      alert('請先在上方「班級篩選」下拉選單選擇班級！');
+      return;
+    }
+    if (batchClassNameEl) batchClassNameEl.innerText = targetClass;
+    if (inputBatchVal) inputBatchVal.value = '100';
+
+    // 統計當前班級已登載名額
+    let count = 0;
+    const rows = studentsTableBody ? studentsTableBody.querySelectorAll('tr') : [];
+    rows.forEach(r => {
+      if (r.querySelector('.btn-modify-pwd')) count++;
+    });
+    if (batchCountEl) batchCountEl.innerText = count || '全班';
+
+    if (modalBatch) modalBatch.style.display = 'flex';
+  }
+
+  function closeBatchCoinsModal() {
+    if (modalBatch) modalBatch.style.display = 'none';
+  }
+
+  if (btnBatchCoins) {
+    btnBatchCoins.onclick = () => {
+      const selectedClass = studentClassSelect ? studentClassSelect.value : '';
+      if (!selectedClass) {
+        alert('請先在上方「班級篩選」選擇欲補發金幣的班級！');
+        return;
+      }
+      openBatchCoinsModal(selectedClass);
+    };
+  }
+
+  if (btnCloseBatch) btnCloseBatch.onclick = closeBatchCoinsModal;
+  if (btnCancelBatch) btnCancelBatch.onclick = closeBatchCoinsModal;
+
+  // 批次快速預設值
+  const batchPresets = document.querySelectorAll('.btn-batch-preset');
+  batchPresets.forEach(b => {
+    b.onclick = () => {
+      if (inputBatchVal) inputBatchVal.value = b.dataset.val;
+    };
+  });
+
+  if (btnConfirmBatch) {
+    btnConfirmBatch.onclick = async () => {
+      const selectedClass = studentClassSelect ? studentClassSelect.value : '';
+      if (!selectedClass) return;
+      const amount = parseInt(inputBatchVal ? inputBatchVal.value : '0', 10);
+      if (isNaN(amount) || amount <= 0) {
+        alert('⚠️ 請輸入大於 0 的每人補發數量！');
+        return;
+      }
+      const reason = inputBatchReason ? inputBatchReason.value.trim() : '全班課堂獎勵';
+
+      btnConfirmBatch.disabled = true;
+      btnConfirmBatch.innerText = '⏳ 正在批次寫入雲端...';
+
+      try {
+        if (window.cloudSync && window.cloudSync.adminBatchAdjustClassCoins) {
+          const res = await window.cloudSync.adminBatchAdjustClassCoins(selectedClass, amount, reason);
+          if (res && res.success) {
+            alert(`🎉 成功！已為【${selectedClass}】全班共 ${res.count} 名學員每人增加 🪙 ${res.amount} 星幣！\n\n原因：${reason}\n雲端資料庫已即時同步更新！`);
+            closeBatchCoinsModal();
+            loadStudentsRoster();
+          } else {
+            alert(`❌ 批次補發失敗：${res ? res.error : '未知錯誤'}`);
+          }
+        }
+      } catch (err) {
+        alert(`❌ 批次補發發生錯誤：${err.message}`);
+      } finally {
+        btnConfirmBatch.disabled = false;
+        btnConfirmBatch.innerText = '🎁 確定執行全班批次補發';
+      }
+    };
   }
 
   // =========================================================================

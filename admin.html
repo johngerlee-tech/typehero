@@ -468,9 +468,12 @@
                 <!-- 班級選項 -->
               </select>
             </div>
-            <div style="display:flex; gap:0.4rem;">
+            <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
               <button id="admin-btn-toggle-show-pwd" class="btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.65rem;">
                 👁️ 顯示/隱藏密碼
+              </button>
+              <button id="admin-btn-batch-add-coins" class="btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.7rem; border-color:#10b981; color:#34d399; background:rgba(16, 185, 129, 0.12); font-weight:bold;" title="【上課老師可用】為目前所選班級所有同學統一增加或補發星幣">
+                🎁 全班批次補幣
               </button>
               <button id="admin-btn-refresh-students" class="btn-primary" style="font-size:0.75rem; padding:0.3rem 0.75rem;">
                 🔄 重新整理名冊
@@ -515,6 +518,7 @@
               <span>🛡️ 上課教師課堂即時處置功能（授課教師與管理者完全可用）：</span>
             </div>
             <div style="color: var(--text-muted);">
+              • <strong style="color: #34d399;">💰 補發金幣</strong>：<strong>【課堂進度救援與表現獎勵】</strong>若孩子遇關卡跳出、換電腦或異常而損失金幣，老師點擊「補發金幣」或點選星幣欄位，即可為單一學生（或點擊上方「🎁 全班批次補幣」）立即補回指定星幣，直接回存雲端資料庫！<br>
               • <strong style="color: var(--brand-primary);">✏️ 修改密碼</strong>：學生忘記密碼或換電腦無法登入時，老師可直接為其重設新密碼。<br>
               • <strong style="color: #fbbf24;">🔓 解除綁定</strong>：<strong>【及時解決冒用】</strong>若座號遭其他非本班同學或他人亂登入占用，老師點擊「解除綁定」即可<strong>立即清空冒用之密碼與暱稱</strong>，並<strong>完整保留名冊真實姓名與學號學籍</strong>，讓該座號同學能當場順利登入！<br>
               • <strong style="color: #f87171;">🗑️ 刪除</strong>：若有重複建置或錯誤的座號檔案，可直接點擊刪除清理存檔。
@@ -525,14 +529,14 @@
             <table class="students-table">
               <thead>
                 <tr>
-                  <th style="width: 50px;">座號</th>
-                  <th style="width: 80px;">學號</th>
-                  <th style="width: 85px;">真實姓名</th>
+                  <th style="width: 48px;">座號</th>
+                  <th style="width: 75px;">學號</th>
+                  <th style="width: 80px;">真實姓名</th>
                   <th>自訂暱稱</th>
-                  <th style="width: 60px;">等級</th>
-                  <th style="width: 75px;">星幣</th>
+                  <th style="width: 58px;">等級</th>
+                  <th style="width: 85px;">星幣</th>
                   <th>通行密碼</th>
-                  <th style="width: 220px; text-align:center;">帳號管理操作</th>
+                  <th style="width: 300px; text-align:center;">帳號管理操作</th>
                 </tr>
               </thead>
               <tbody id="admin-students-table-body">
@@ -924,6 +928,174 @@
     </div>
   </main>
 
+  <!-- 學生星幣補發與手動調整彈窗 (授課教師完全可用) -->
+  <div class="modal-backdrop" id="modal-adjust-coins" style="display:none;">
+    <div class="modal-sheet" style="max-width: 500px;">
+      <div class="modal-rainbow-bar"></div>
+      <div class="modal-content" style="align-items: stretch; text-align: left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+          <h3 style="font-size: 1.2rem; font-weight: 800; display:flex; align-items:center; gap:0.5rem; margin:0; color:#fbbf24;">
+            <span>🪙</span> 學生星幣補發與手動調整
+          </h3>
+          <button class="btn-icon" id="btn-close-adjust-coins-modal" style="width: 32px; height: 32px;">✕</button>
+        </div>
+
+        <!-- 學生資訊列 -->
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem 1rem; margin-bottom: 0.85rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+            <div>
+              <div style="font-size: 1rem; font-weight: 800; color: #fff; display:flex; align-items:center; gap:0.4rem;">
+                <span id="adjust-coins-student-desc">一年甲班 1號 王大明</span>
+                <span id="adjust-coins-student-level" style="font-size:0.72rem; padding:0.12rem 0.45rem; border-radius:4px; background:rgba(99,102,241,0.2); color:#818cf8; font-weight:bold;">Lv.1</span>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 3px;">
+                學號：<span id="adjust-coins-student-no">-</span> · 暱稱：<span id="adjust-coins-student-nick" style="color:var(--brand-primary); font-weight:bold;">-</span>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size: 0.72rem; color: var(--text-muted);">目前持有星幣</div>
+              <div style="font-size: 1.35rem; font-weight: 900; color: #fbbf24; line-height: 1.2;">
+                🪙 <span id="adjust-coins-current-val">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 說明條 -->
+        <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.85rem; padding: 0.5rem 0.75rem; background: rgba(99,102,241,0.08); border-radius: 6px; border: 1px solid rgba(99,102,241,0.25);">
+          💡 <strong>教師課堂補償功能</strong>：若學生因關卡重設、換電腦或異常遺失金幣，老師可在此立即補發星幣，數值將直接同步至雲端資料庫並永久保存！
+        </div>
+
+        <!-- 操作模式選擇 -->
+        <div style="margin-bottom: 0.85rem;">
+          <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.4rem; color:var(--text-main);">
+            選擇調整模式：
+          </label>
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0.5rem;">
+            <button type="button" class="btn-coin-mode active" id="btn-mode-add" data-mode="add" style="padding:0.45rem; font-size:0.78rem; font-weight:bold; border-radius:6px; border:1px solid #10b981; background:rgba(16, 185, 129, 0.15); color:#34d399; cursor:pointer;">
+              ➕ 補發增加
+            </button>
+            <button type="button" class="btn-coin-mode" id="btn-mode-set" data-mode="set" style="padding:0.45rem; font-size:0.78rem; font-weight:bold; border-radius:6px; border:1px solid var(--border-color); background:rgba(255,255,255,0.04); color:var(--text-muted); cursor:pointer;">
+              🎯 指定總數
+            </button>
+            <button type="button" class="btn-coin-mode" id="btn-mode-sub" data-mode="subtract" style="padding:0.45rem; font-size:0.78rem; font-weight:bold; border-radius:6px; border:1px solid var(--border-color); background:rgba(255,255,255,0.04); color:var(--text-muted); cursor:pointer;">
+              ➖ 扣除金幣
+            </button>
+          </div>
+        </div>
+
+        <!-- 快速預設值按鈕 -->
+        <div id="adjust-coins-presets-wrap" style="margin-bottom: 0.85rem;">
+          <label id="adjust-coins-presets-label" style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:0.35rem;">
+            快速增額預設：
+          </label>
+          <div id="adjust-coins-presets-buttons" style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button type="button" class="btn-coin-preset btn-secondary" data-val="100" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+100 幣</button>
+            <button type="button" class="btn-coin-preset btn-secondary" data-val="200" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+200 幣</button>
+            <button type="button" class="btn-coin-preset btn-secondary" data-val="300" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+300 幣</button>
+            <button type="button" class="btn-coin-preset btn-secondary" data-val="400" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+400 幣</button>
+            <button type="button" class="btn-coin-preset btn-secondary" data-val="500" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+500 幣</button>
+          </div>
+        </div>
+
+        <!-- 金額輸入框 -->
+        <div style="margin-bottom: 0.85rem;">
+          <label for="input-adjust-coins-val" style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.35rem;">
+            <span id="adjust-coins-input-label">請輸入欲補發增加的星幣數量：</span>
+          </label>
+          <div style="position:relative;">
+            <span style="position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); font-size:1.1rem;">🪙</span>
+            <input type="number" id="input-adjust-coins-val" class="form-input" placeholder="例如: 350" style="padding-left:2.4rem; font-size:1rem; font-weight:bold; color:#fbbf24;" min="1" max="99999" value="100">
+          </div>
+        </div>
+
+        <!-- 試算結果預覽 -->
+        <div style="background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.4); border-radius: var(--radius-sm); padding: 0.65rem 0.85rem; margin-bottom: 1rem; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.8rem; color:var(--text-muted);">調整後該學生將持有：</span>
+          <span style="font-size:1.15rem; font-weight:900; color:#fbbf24;">
+            🪙 <span id="adjust-coins-preview-val">100</span> 星幣
+          </span>
+        </div>
+
+        <div style="display:flex; gap:0.6rem; justify-content:flex-end;">
+          <button type="button" id="btn-cancel-adjust-coins" class="btn-secondary" style="padding:0.55rem 1rem;">
+            取消
+          </button>
+          <button type="button" id="btn-confirm-adjust-coins" class="btn-primary" style="padding:0.55rem 1.4rem; background:linear-gradient(135deg, #10b981, #059669); font-weight:bold;">
+            💾 確定儲存並同步至雲端
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全班批次補發星幣彈窗 (授課教師完全可用) -->
+  <div class="modal-backdrop" id="modal-batch-coins" style="display:none;">
+    <div class="modal-sheet" style="max-width: 460px;">
+      <div class="modal-rainbow-bar"></div>
+      <div class="modal-content" style="align-items: stretch; text-align: left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+          <h3 style="font-size: 1.15rem; font-weight: 800; display:flex; align-items:center; gap:0.5rem; margin:0; color:#34d399;">
+            <span>🎁</span> 全班統一批次補發星幣
+          </h3>
+          <button class="btn-icon" id="btn-close-batch-coins-modal" style="width: 32px; height: 32px;">✕</button>
+        </div>
+
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); padding: 0.85rem; margin-bottom: 0.85rem;">
+          <div style="font-size: 0.95rem; font-weight: 800; color: #fff;">
+            目標班級：<span id="batch-coins-class-name" style="color:#fbbf24;">五年1班</span>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 3px;">
+            共計 <strong id="batch-coins-student-count" style="color:#34d399;">0</strong> 名已登入學員帳號將獲得補發
+          </div>
+        </div>
+
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.5;">
+          此功能將為目前所選班級的<strong>所有已註冊學生</strong>每人增加指定數量的星幣。可用於全班課堂獎勵、系統維護補償或進度獎助。
+        </p>
+
+        <div style="margin-bottom: 0.85rem;">
+          <label style="font-size:0.78rem; color:var(--text-muted); display:block; margin-bottom:0.35rem;">
+            快速選擇每人補發數量：
+          </label>
+          <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button type="button" class="btn-batch-preset btn-secondary" data-val="50" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+50 幣</button>
+            <button type="button" class="btn-batch-preset btn-secondary" data-val="100" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+100 幣</button>
+            <button type="button" class="btn-batch-preset btn-secondary" data-val="200" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+200 幣</button>
+            <button type="button" class="btn-batch-preset btn-secondary" data-val="300" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+300 幣</button>
+            <button type="button" class="btn-batch-preset btn-secondary" data-val="500" style="padding:0.25rem 0.6rem; font-size:0.75rem;">+500 幣</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 0.85rem;">
+          <label for="input-batch-coins-val" style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:0.35rem;">
+            每人補發星幣數量：
+          </label>
+          <div style="position:relative;">
+            <span style="position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); font-size:1.1rem;">🪙</span>
+            <input type="number" id="input-batch-coins-val" class="form-input" placeholder="例如: 100" style="padding-left:2.4rem; font-size:1rem; font-weight:bold; color:#fbbf24;" min="1" max="9999" value="100">
+          </div>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <label for="input-batch-coins-reason" style="font-size:0.78rem; font-weight:bold; display:block; margin-bottom:0.35rem;">
+            補發原因說明（選填）：
+          </label>
+          <input type="text" id="input-batch-coins-reason" class="form-input" placeholder="如: 課堂優良表現獎勵 / 系統資料救援補償" style="font-size:0.8rem;" maxlength="50" value="課堂努力獎勵">
+        </div>
+
+        <div style="display:flex; gap:0.6rem; justify-content:flex-end;">
+          <button type="button" id="btn-cancel-batch-coins" class="btn-secondary" style="padding:0.55rem 1rem;">
+            取消
+          </button>
+          <button type="button" id="btn-confirm-batch-coins" class="btn-primary" style="padding:0.55rem 1.4rem; background:linear-gradient(135deg, #10b981, #059669); font-weight:bold;">
+            🎁 確定執行全班批次補發
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 教師首次登入通關密語驗證彈窗 -->
   <div class="modal-backdrop" id="modal-teacher-passcode">
     <div class="modal-sheet" style="max-width: 480px;">
@@ -991,7 +1163,7 @@
   </footer>
 
   <!-- 模組腳本載入 (版本號防快取) -->
-  <script src="js/firebase-config.js?v=3.3.1"></script>
-  <script src="js/admin.js?v=3.3.1"></script>
+  <script src="js/firebase-config.js?v=3.3.3"></script>
+  <script src="js/admin.js?v=3.3.3"></script>
 </body>
 </html>

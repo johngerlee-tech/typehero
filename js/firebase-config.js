@@ -1197,6 +1197,166 @@ class CloudSyncManager {
     }
   }
 
+  /**
+   * 上課教師專屬：後台為特定學童調整或補發星幣（預防關卡異常遺失補償或課堂獎勵）
+   */
+  async adminAdjustStudentCoins(className, seatNumber, amount, mode = 'add', reason = '') {
+    const cleanClass = String(className).trim();
+    const rawSeat = String(seatNumber).trim();
+    const cleanSeat = /^\d+$/.test(rawSeat) ? String(parseInt(rawSeat, 10)) : rawSeat;
+    let studentId = `${cleanClass}_${cleanSeat}`;
+    const numAmount = Math.round(Number(amount)) || 0;
+
+    if (!this.isFirebaseReady || !this.db) {
+      // 離線防護：更新本機快取
+      const localKey = 'typehero_player_data_' + studentId;
+      try {
+        const rawLocal = localStorage.getItem(localKey);
+        let cur = 0;
+        let data = {};
+        if (rawLocal) {
+          data = JSON.parse(rawLocal);
+          cur = Number(data.coins) || 0;
+        }
+        let updated = cur;
+        if (mode === 'add') updated = Math.max(0, cur + Math.abs(numAmount));
+        else if (mode === 'subtract') updated = Math.max(0, cur - Math.abs(numAmount));
+        else if (mode === 'set') updated = Math.max(0, Math.abs(numAmount));
+        data.coins = updated;
+        localStorage.setItem(localKey, JSON.stringify(data));
+        return { success: true, offline: true, oldCoins: cur, newCoins: updated, delta: updated - cur };
+      } catch (e) {
+        return { success: false, error: '本地更新失敗' };
+      }
+    }
+
+    try {
+      let docRef = this.db.collection('students').doc(studentId);
+      let docSnap = await docRef.get();
+
+      // 防呆：若查無文件，嘗試雙位數補零 (如 "05")
+      if (!docSnap.exists) {
+        const altSeat = /^\d+$/.test(rawSeat) ? String(rawSeat).padStart(2, '0') : rawSeat;
+        const altId = `${cleanClass}_${altSeat}`;
+        if (altId !== studentId) {
+          const altDoc = await this.db.collection('students').doc(altId).get();
+          if (altDoc.exists) {
+            studentId = altId;
+            docRef = this.db.collection('students').doc(altId);
+            docSnap = altDoc;
+          }
+        }
+      }
+
+      let currentCoins = 0;
+      let existingData = {};
+      if (docSnap.exists) {
+        existingData = docSnap.data() || {};
+        currentCoins = Number(existingData.coins) || 0;
+      }
+
+      let newCoins = currentCoins;
+      if (mode === 'add') {
+        newCoins = Math.max(0, currentCoins + Math.abs(numAmount));
+      } else if (mode === 'subtract') {
+        newCoins = Math.max(0, currentCoins - Math.abs(numAmount));
+      } else if (mode === 'set') {
+        newCoins = Math.max(0, Math.abs(numAmount));
+      }
+
+      const updatePayload = {
+        className: cleanClass,
+        seatNumber: cleanSeat,
+        coins: newCoins,
+        adminAdjustedCoinsAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastCoinAdjustment: {
+          previousCoins: currentCoins,
+          newCoins: newCoins,
+          delta: newCoins - currentCoins,
+          mode: mode,
+          reason: reason || '授課教師課堂調整',
+          timestamp: new Date().toISOString()
+        },
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      await docRef.set(updatePayload, { merge: true });
+
+      // 同步更新本機該學生快取
+      const localKey = 'typehero_player_data_' + studentId;
+      try {
+        const rawLocal = localStorage.getItem(localKey);
+        if (rawLocal) {
+          const parsed = JSON.parse(rawLocal);
+          parsed.coins = newCoins;
+          localStorage.setItem(localKey, JSON.stringify(parsed));
+        }
+      } catch (e) {}
+
+      if (window.shopManager && window.shopManager.currentStudentId === studentId) {
+        window.shopManager.data.coins = newCoins;
+        window.shopManager.saveData(false);
+        window.shopManager.updateUI();
+      }
+
+      console.log(`✅ [教師權限] 成功為學生 [${studentId}] 調整星幣：${currentCoins} -> ${newCoins} 幣 (模式: ${mode}, 異動: ${newCoins - currentCoins})`);
+      return { success: true, studentId, oldCoins: currentCoins, newCoins: newCoins, delta: newCoins - currentCoins };
+    } catch (err) {
+      console.error('教師後台調整學生星幣失敗:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * 上課教師專屬：批次為全班所有學生統一增加星幣（課堂獎勵 / 全班補償）
+   */
+  async adminBatchAdjustClassCoins(className, amount, reason = '全班課堂獎勵') {
+    if (!this.isFirebaseReady || !this.db) return { success: false, error: 'Firebase 尚未連線' };
+    const cleanClass = String(className).trim();
+    const numAmount = Math.round(Number(amount)) || 0;
+    if (numAmount === 0) return { success: false, error: '補發數量不得為 0' };
+
+    try {
+      const snapshot = await this.db.collection('students')
+        .where('className', '==', cleanClass)
+        .get();
+
+      if (snapshot.empty) {
+        return { success: false, error: `【${cleanClass}】目前尚無學生雲端帳號紀錄` };
+      }
+
+      const batch = this.db.batch();
+      let count = 0;
+
+      snapshot.forEach(doc => {
+        const data = doc.data() || {};
+        const currentCoins = Number(data.coins) || 0;
+        const newCoins = Math.max(0, currentCoins + numAmount);
+        batch.set(doc.ref, {
+          coins: newCoins,
+          adminAdjustedCoinsAt: firebase.firestore.FieldValue.serverTimestamp(),
+          lastCoinAdjustment: {
+            previousCoins: currentCoins,
+            newCoins: newCoins,
+            delta: newCoins - currentCoins,
+            mode: 'batch_add',
+            reason: reason,
+            timestamp: new Date().toISOString()
+          },
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        count++;
+      });
+
+      await batch.commit();
+      console.log(`✅ [教師權限] 成功為【${cleanClass}】共 ${count} 名學生每人補發 ${numAmount} 星幣！`);
+      return { success: true, count, amount: numAmount };
+    } catch (err) {
+      console.error('全班批次補發星幣失敗:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
   // ==========================================
   // 全校名冊身分綁定與學年度升級移轉引擎
   // ==========================================
