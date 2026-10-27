@@ -57,6 +57,16 @@ class CloudSyncManager {
     // 初始化 Firebase
     this.initFirebase();
 
+    // 嘗試預載 115 學年度名冊計算各班精確座號上限
+    this.classSeatLimits = null;
+    try {
+      if (typeof fetch === 'function') {
+        fetch('student_115.csv').then(res => res.ok ? res.text() : null).then(txt => {
+          if (txt) this.parseRosterSeatLimits(txt);
+        }).catch(() => {});
+      }
+    } catch (e) {}
+
     // 本地已有現行學生身份時，自動將 ShopManager 綁定並載入該學生專屬進度
     if (this.profile && this.profile.hasRegistered && this.profile.className && this.profile.seatNumber) {
       const studentId = `${this.profile.className}_${this.profile.seatNumber}`;
@@ -391,6 +401,58 @@ class CloudSyncManager {
     if (!info.enabled || !info.passcode) return true; // 未開啟防護則直接通過
     const cleanInput = String(inputPasscode || '').trim();
     return cleanInput === info.passcode;
+  }
+
+  /**
+   * 取得指定班級之合法最大座號人數 (若為本校名冊班級則取實際人數，否則預設 35)
+   */
+  getClassMaxSeat(className) {
+    if (!className) return 35;
+    const cleanClass = String(className).trim();
+
+    // 1. 若本地有名冊資料庫快取，以名冊實際最大座號為準
+    if (this.classSeatLimits && this.classSeatLimits[cleanClass]) {
+      return this.classSeatLimits[cleanClass];
+    }
+
+    // 2. 溪洲國小 115 學年度名冊官方標準各班編制人數
+    const KNOWN_CLASS_SEATS = {
+      '一年甲班': 18,
+      '一年乙班': 18,
+      '二年甲班': 14,
+      '二年乙班': 13,
+      '三年甲班': 16,
+      '三年乙班': 17,
+      '四年甲班': 18,
+      '四年乙班': 20,
+      '五年甲班': 20,
+      '五年乙班': 20,
+      '六年甲班': 21,
+      '六年乙班': 21
+    };
+
+    if (KNOWN_CLASS_SEATS[cleanClass]) {
+      return KNOWN_CLASS_SEATS[cleanClass];
+    }
+
+    // 3. 測試組、示範組或其他自訂班級，預設上限 35 人
+    return 35;
+  }
+
+  parseRosterSeatLimits(csvText) {
+    if (!csvText) return;
+    this.classSeatLimits = this.classSeatLimits || {};
+    const lines = csvText.replace(/\r\n/g, '\n').split('\n');
+    lines.slice(1).forEach(l => {
+      const parts = l.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        const cls = parts[0];
+        const seat = parseInt(parts[1], 10);
+        if (cls && !isNaN(seat) && seat > 0) {
+          this.classSeatLimits[cls] = Math.max(this.classSeatLimits[cls] || 0, seat);
+        }
+      }
+    });
   }
 
   async saveClassPasscode(className, enabled, passcode) {

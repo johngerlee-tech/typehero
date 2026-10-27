@@ -2067,6 +2067,8 @@ function initModals() {
   const loginClassPasscodeInp = document.getElementById('login-class-passcode-input');
   const loginClassPasscodeError = document.getElementById('login-class-passcode-error');
   const loginSeatInp = document.getElementById('login-seat-input');
+  const loginSeatRangeHint = document.getElementById('login-seat-range-hint');
+  const loginSeatErrorMsg = document.getElementById('login-seat-error-msg');
   const loginNameInp = document.getElementById('login-name-input');
   const loginPassInp = document.getElementById('login-password-input');
   const loginPassError = document.getElementById('login-password-error');
@@ -2087,19 +2089,158 @@ function initModals() {
     if (loginClassPasscodeError) loginClassPasscodeError.style.display = 'none';
   }
 
+  // 動態更新當前選取班級之合法座號範圍指示與輸入框限制
+  function updateSeatRangeUI() {
+    const selClass = loginClassSel ? loginClassSel.value : '';
+    if (!loginSeatRangeHint || !loginSeatInp) return;
+
+    if (!selClass || selClass === '=選擇班級=') {
+      loginSeatRangeHint.innerText = '請先選班級';
+      loginSeatRangeHint.style.color = 'var(--text-muted)';
+      loginSeatRangeHint.style.background = 'rgba(255,255,255,0.06)';
+      loginSeatInp.placeholder = '請先選班級';
+      loginSeatInp.removeAttribute('min');
+      loginSeatInp.removeAttribute('max');
+      return;
+    }
+
+    const maxSeat = (window.cloudSync && typeof window.cloudSync.getClassMaxSeat === 'function')
+      ? window.cloudSync.getClassMaxSeat(selClass)
+      : 35;
+
+    loginSeatRangeHint.innerText = `範圍：1 ~ ${maxSeat} 號`;
+    loginSeatRangeHint.style.color = '#34d399';
+    loginSeatRangeHint.style.background = 'rgba(16, 185, 129, 0.15)';
+    loginSeatInp.placeholder = `請輸入 1 ~ ${maxSeat}`;
+    loginSeatInp.min = '1';
+    loginSeatInp.max = String(maxSeat);
+
+    // 重新檢驗現有值是否符合新班級範圍
+    validateSeatInput(false);
+  }
+
+  /**
+   * 嚴格座號驗證與即時防呆過濾：
+   * 1. 嚴格限定在 1 ~ maxSeat 人數範圍內
+   * 2. 徹底拒絕非純數字字元、文字、符號、空格或負數
+   * 3. 嚴格禁止前導 0（個位數不可輸入 01、02...，且不能單獨輸入 0）
+   */
+  function validateSeatInput(showEmptyError = false) {
+    if (!loginSeatInp) return { valid: false };
+    const selClass = loginClassSel ? loginClassSel.value : '';
+    let raw = loginSeatInp.value;
+
+    // 1. 若尚未選班級即點擊座號
+    if (!selClass || selClass === '=選擇班級=') {
+      if (raw) loginSeatInp.value = '';
+      if (loginSeatErrorMsg) {
+        loginSeatErrorMsg.innerText = '⚠️ 請先在上方選單選擇您的所屬班級！';
+        loginSeatErrorMsg.style.display = 'block';
+      }
+      loginSeatInp.style.borderColor = '#ef4444';
+      return { valid: false, reason: 'NO_CLASS' };
+    }
+
+    const maxSeat = (window.cloudSync && typeof window.cloudSync.getClassMaxSeat === 'function')
+      ? window.cloudSync.getClassMaxSeat(selClass)
+      : 35;
+
+    // 2. 剔除所有非數字字元
+    let clean = raw.replace(/\D/g, '');
+
+    // 3. 嚴格禁止前導 0 (不能輸入 0 或 01、02...)
+    let hadLeadingZero = false;
+    if (clean.startsWith('0')) {
+      hadLeadingZero = true;
+      clean = clean.replace(/^0+/, '');
+    }
+
+    // 將自動修正後的乾淨純數字回寫輸入框
+    if (loginSeatInp.value !== clean) {
+      loginSeatInp.value = clean;
+    }
+
+    if (clean === '') {
+      if (hadLeadingZero) {
+        if (loginSeatErrorMsg) {
+          loginSeatErrorMsg.innerText = '⚠️ 座號從 1 號開始，請勿輸入 0 或 0 開頭數字喔！';
+          loginSeatErrorMsg.style.display = 'block';
+        }
+        loginSeatInp.style.borderColor = '#ef4444';
+      } else if (showEmptyError) {
+        if (loginSeatErrorMsg) {
+          loginSeatErrorMsg.innerText = `⚠️ 請輸入學生座號（1 ~ ${maxSeat} 號）！`;
+          loginSeatErrorMsg.style.display = 'block';
+        }
+        loginSeatInp.style.borderColor = '#ef4444';
+      } else {
+        if (loginSeatErrorMsg) loginSeatErrorMsg.style.display = 'none';
+        loginSeatInp.style.borderColor = '';
+      }
+      return { valid: false, reason: 'EMPTY', maxSeat };
+    }
+
+    // 4. 數值範圍檢驗 (1 ~ maxSeat)
+    const num = parseInt(clean, 10);
+    if (isNaN(num) || num < 1 || num > maxSeat) {
+      if (loginSeatErrorMsg) {
+        loginSeatErrorMsg.innerText = `⚠️ 座號超出本班人數範圍！【${selClass}】座號為 1 ~ ${maxSeat} 號`;
+        loginSeatErrorMsg.style.display = 'block';
+      }
+      loginSeatInp.style.borderColor = '#ef4444';
+      return { valid: false, reason: 'OUT_OF_RANGE', maxSeat };
+    }
+
+    // 格式與範圍完全正確
+    if (loginSeatErrorMsg) loginSeatErrorMsg.style.display = 'none';
+    loginSeatInp.style.borderColor = '#10b981';
+    return { valid: true, seat: String(num), maxSeat };
+  }
+
+  if (loginSeatInp) {
+    // 即時輸入過濾與防呆
+    loginSeatInp.addEventListener('input', () => {
+      validateSeatInput(false);
+    });
+    loginSeatInp.addEventListener('blur', () => {
+      if (loginSeatInp.value.trim() !== '') {
+        validateSeatInput(false);
+      }
+    });
+    loginSeatInp.addEventListener('focus', () => {
+      const selClass = loginClassSel ? loginClassSel.value : '';
+      if (!selClass || selClass === '=選擇班級=') {
+        if (loginSeatErrorMsg) {
+          loginSeatErrorMsg.innerText = '💡 請先在上方選單選擇您的所屬班級喔！';
+          loginSeatErrorMsg.style.display = 'block';
+        }
+        if (loginClassSel) loginClassSel.focus();
+      }
+    });
+  }
+
   if (loginClassSel) {
     loginClassSel.addEventListener('change', () => {
       updateClassPasscodeVisibility(loginClassSel.value);
+      updateSeatRangeUI();
+      if (loginSeatInp && loginClassSel.value && loginClassSel.value !== '=選擇班級=') {
+        loginSeatInp.focus();
+      }
     });
   }
 
   window.openStudentLoginModal = function() {
     if (loginClassSel) loginClassSel.value = '';
-    if (loginSeatInp) loginSeatInp.value = '';
+    if (loginSeatInp) {
+      loginSeatInp.value = '';
+      loginSeatInp.style.borderColor = '';
+    }
+    if (loginSeatErrorMsg) loginSeatErrorMsg.style.display = 'none';
     if (loginNameInp) loginNameInp.value = '';
     if (loginPassInp) loginPassInp.value = '';
     if (loginPassError) loginPassError.style.display = 'none';
     updateClassPasscodeVisibility('');
+    updateSeatRangeUI();
     if (loginModal) loginModal.classList.add('active');
     setTimeout(() => {
       if (loginClassSel) loginClassSel.focus();
@@ -2110,7 +2251,6 @@ function initModals() {
     loginForm.onsubmit = async (e) => {
       e.preventDefault();
       const selClass = loginClassSel ? loginClassSel.value : '';
-      const seatVal = loginSeatInp ? loginSeatInp.value.trim() : '';
       const nameVal = loginNameInp ? loginNameInp.value.trim() : '';
       const passVal = loginPassInp ? loginPassInp.value.trim() : '';
 
@@ -2139,11 +2279,33 @@ function initModals() {
         }
       }
 
-      if (!seatVal) {
-        alert('⚠️ 請輸入學生座號喔！');
+      // 嚴格檢驗學生座號
+      const seatCheck = validateSeatInput(true);
+      if (!seatCheck.valid) {
+        if (seatCheck.reason === 'NO_CLASS') {
+          alert('⚠️ 請先選擇您的所屬班級喔！');
+          if (loginClassSel) loginClassSel.focus();
+          return;
+        }
+        if (seatCheck.reason === 'EMPTY') {
+          alert(`⚠️ 請輸入學生座號（【${selClass}】座號範圍為 1 ~ ${seatCheck.maxSeat || 20} 號）！`);
+          if (loginSeatInp) loginSeatInp.focus();
+          return;
+        }
+        if (seatCheck.reason === 'OUT_OF_RANGE') {
+          alert(`⚠️ 座號超出本班人數範圍！\n【${selClass}】的合法座號為 1 ~ ${seatCheck.maxSeat} 號，且不可輸入 01、02... 等前導 0 喔！`);
+          if (loginSeatInp) {
+            loginSeatInp.select();
+            loginSeatInp.focus();
+          }
+          return;
+        }
+        alert('⚠️ 座號格式不正確，請輸入 1、2、3... 形式的純數字！');
         if (loginSeatInp) loginSeatInp.focus();
         return;
       }
+      const seatVal = seatCheck.seat;
+
       if (!nameVal) {
         alert('⚠️ 請輸入姓名或打字暱稱喔！');
         if (loginNameInp) loginNameInp.focus();
